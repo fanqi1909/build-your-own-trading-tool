@@ -1,0 +1,21 @@
+services:
+  build-your-own-trade:
+    build: .
+    ports:
+      - "3000:3000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      # Mount OKX config — run `okx config init` on host first
+      - ~/.okx:/root/.okx:ro
+      # Mount source for live editing — no rebuild needed
+      - ./server.js:/app/server.js
+      - ./adapters:/app/adapters
+      - ./lib:/app/lib
+      - ./public:/app/public
+      - ./analyze.py:/app/analyze.py
+      # Persist runtime data
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=development
