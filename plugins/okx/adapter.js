@@ -1,15 +1,15 @@
 'use strict';
+// Extracted from adapters/okx-cli.js
 
 const { exec } = require('child_process');
-const { AdapterError } = require('./base');
+const { AdapterError } = require('./types');
 
-// ─── Internal CLI runner ────────────────────────────────
-// Sole place that knows about --demo / --profile live flags.
 function _run(args, mode) {
   const flag = mode === 'demo' ? '--demo' : '--profile live';
   const cmd  = `okx ${flag} ${args} --json`;
   return new Promise((resolve, reject) => {
-    exec(cmd, { timeout: 10000 }, (err, stdout, stderr) => {
+    const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` };
+    exec(cmd, { timeout: 10000, env }, (err, stdout, stderr) => {
       if (err) {
         let msg = stderr?.trim() || err.message;
         try {
@@ -24,15 +24,11 @@ function _run(args, mode) {
   });
 }
 
-// ─── Read ───────────────────────────────────────────────
-
-/** @returns {Promise<import('./base').Ticker|null>} */
 async function fetchTicker(inst, mode) {
   const data = await _run(`market ticker ${inst}`, mode);
   return data?.[0] ?? null;
 }
 
-/** @returns {Promise<import('./base').Balance[]>} */
 async function fetchBalance(mode) {
   const data = await _run('account balance', mode);
   const arr  = Array.isArray(data?.[0]?.details) ? data[0].details : (Array.isArray(data) ? data : []);
@@ -44,7 +40,6 @@ async function fetchBalance(mode) {
   }));
 }
 
-/** @returns {Promise<import('./base').Position[]>} */
 async function fetchPositions(mode) {
   const data = await _run('swap positions', mode);
   return (data ?? []).map(p => ({
@@ -63,7 +58,6 @@ async function fetchPositions(mode) {
   }));
 }
 
-/** @returns {Promise<import('./base').Candle[]>} */
 async function fetchCandles(inst, bar, limit, mode) {
   const data = await _run(`market candles ${inst} --bar ${bar} --limit ${limit}`, mode);
   return (data ?? [])
@@ -97,7 +91,6 @@ async function fetchCandlesBefore(inst, bar, limit, beforeTs, mode) {
     .reverse();
 }
 
-/** @returns {Promise<import('./base').Order[]>} */
 async function fetchHistory(mode) {
   const data = await _run('swap orders --history', mode);
   return (data ?? []).map(o => ({
@@ -118,11 +111,8 @@ async function fetchHistory(mode) {
   }));
 }
 
-// ─── Write ──────────────────────────────────────────────
-
 async function setLeverage({ inst, lever, mgnMode, posMode }, mode) {
   if (posMode === 'long_short') {
-    // 买卖模式需同时设多空两侧
     await Promise.all([
       _run(`swap leverage --instId ${inst} --lever ${lever} --mgnMode ${mgnMode} --posSide long`, mode),
       _run(`swap leverage --instId ${inst} --lever ${lever} --mgnMode ${mgnMode} --posSide short`, mode),
@@ -132,7 +122,6 @@ async function setLeverage({ inst, lever, mgnMode, posMode }, mode) {
   }
 }
 
-/** @returns {Promise<{ ordId: string }>} */
 async function placeMarketOrder({ inst, side, sz, posSide }, mode) {
   let args = `swap place --instId ${inst} --side ${side} --sz ${sz} --ordType market`;
   if (posSide) args += ` --posSide ${posSide}`;
@@ -155,8 +144,6 @@ async function closePosition({ inst, closeSide, sz, posSide }, mode) {
   await _run(args, mode);
 }
 
-// ─── Open orders ────────────────────────────────────────
-
 async function fetchOpenOrders(mode) {
   const data = await _run('swap orders', mode);
   return (data ?? []).map(o => ({
@@ -172,7 +159,6 @@ async function fetchOpenOrders(mode) {
   }));
 }
 
-/** @returns {Promise<{ ordId: string }>} */
 async function placeLimitOrder({ inst, side, sz, px, postOnly, posSide, sl, tp }, mode) {
   const ordType = postOnly ? 'post_only' : 'limit';
   let args = `swap place --instId ${inst} --side ${side} --sz ${sz} --ordType ${ordType} --px ${px}`;
@@ -189,12 +175,10 @@ async function cancelOrder({ inst, ordId }, mode) {
 }
 
 async function amendOrder({ inst, ordId, newPx, newSz, side, ordType }, mode) {
-  // CLI has no `swap amend` — cancel and re-place
   await _run(`swap cancel ${inst} --ordId ${ordId}`, mode);
   let placeArgs = `swap place --instId ${inst} --side ${side} --ordType ${ordType || 'limit'} --sz ${newSz}`;
   if (newPx != null) placeArgs += ` --px ${newPx}`;
-  const result = await _run(placeArgs, mode);
-  return result;
+  return _run(placeArgs, mode);
 }
 
 async function fetchAlgoOrders(inst, mode) {
@@ -218,20 +202,9 @@ async function amendAlgoOrder({ inst, algoId, sl, tp }, mode) {
 }
 
 module.exports = {
-  fetchTicker,
-  fetchBalance,
-  fetchPositions,
-  fetchCandles,
-  fetchCandlesBefore,
-  fetchHistory,
-  setLeverage,
-  placeMarketOrder,
-  placeLimitOrder,
-  placeAlgoOrder,
-  closePosition,
-  fetchOpenOrders,
-  cancelOrder,
-  amendOrder,
-  fetchAlgoOrders,
-  amendAlgoOrder,
+  fetchTicker, fetchBalance, fetchPositions,
+  fetchCandles, fetchCandlesBefore, fetchHistory,
+  setLeverage, placeMarketOrder, placeLimitOrder, placeAlgoOrder,
+  closePosition, fetchOpenOrders, cancelOrder, amendOrder,
+  fetchAlgoOrders, amendAlgoOrder,
 };

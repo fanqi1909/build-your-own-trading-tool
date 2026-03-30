@@ -1,49 +1,20 @@
 'use strict';
-/**
- * lib/chat.js — AI Chat Session
- *
- * Uses Claude Code CLI as a persistent conversational backend.
- * Supports multi-turn conversation via --session-id / --resume.
- * Claude can read and modify project files via --allowedTools.
- *
- * Reference: https://fanqi1909.github.io/ai-capriccio/docs/cli-as-api.html
- */
+// Extracted from lib/chat.js — Claude Code CLI chat session
 
-const { spawn }  = require('child_process');
-const readline   = require('readline');
-const path       = require('path');
+const { spawn }      = require('child_process');
+const readline       = require('readline');
+const path           = require('path');
 const { randomUUID } = require('crypto');
+const fs             = require('fs');
 
-const PROJECT_ROOT = path.join(__dirname, '..');
-
-const SYSTEM_PROMPT = `You are an AI assistant helping the user build and modify their personal trading dashboard.
-
-Project root: ${PROJECT_ROOT}
-Key files:
-  - server.js          — Express + WebSocket server, data refresh loops, order actions
-  - public/index.html  — Frontend UI (~3000 lines, HTML/CSS/vanilla JS)
-  - lib/ai.js          — Claude analysis prompts (technical analysis, postmortem)
-  - lib/store.js       — DuckDB candle DB + JSON persistence
-  - adapters/okx-cli.js — OKX exchange adapter (wraps okx CLI commands)
-
-What you can help with:
-  - Add new panels, charts, or data displays to the dashboard
-  - Remove or hide existing features
-  - Modify trading logic or display formatting
-  - Explain how any part of the code works
-  - Fix bugs
-
-Guidelines:
-  - Always read the relevant file(s) before editing
-  - Make minimal, targeted changes
-  - After editing, briefly explain what you changed and why
-  - If you edit server.js, the server auto-restarts (node --watch is running). Tell the user to refresh the browser.
-  - If you edit public/index.html only, no restart needed — just tell the user to refresh.`;
+const PROJECT_ROOT         = path.join(__dirname, '../..');
+const DEFAULT_SYSTEM_PROMPT = fs.readFileSync(path.join(__dirname, 'prompts/system.md'), 'utf8');
 
 class ChatSession {
-  constructor() {
-    this.sessionId = randomUUID();
-    this.isFirst   = true;
+  constructor(systemPrompt) {
+    this.sessionId    = randomUUID();
+    this.isFirst      = true;
+    this._systemPrompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
   }
 
   reset() {
@@ -61,6 +32,7 @@ class ChatSession {
       '--model', 'claude-sonnet-4-6',
       '-p', message,
       '--output-format', 'stream-json',
+      '--verbose',
       '--allowedTools', 'Read,Write,Edit,Glob,Grep,Bash',
       '--max-turns', '10',
       '--dangerously-skip-permissions',
@@ -68,7 +40,7 @@ class ChatSession {
 
     if (this.isFirst) {
       args.push('--session-id',    this.sessionId);
-      args.push('--system-prompt', SYSTEM_PROMPT);
+      args.push('--system-prompt', this._systemPrompt);
       this.isFirst = false;
     } else {
       args.push('--resume', this.sessionId);
@@ -87,7 +59,6 @@ class ChatSession {
     proc.stdin.end();
 
     const rl = readline.createInterface({ input: proc.stdout, crlfDelay: Infinity });
-
     let finalResult = '';
 
     for await (const line of rl) {

@@ -12,6 +12,7 @@
   "dependencies": {
     "duckdb": "^1.4.4",
     "express": "^4.18.2",
+    "lightweight-charts": "^5.1.0",
     "ws": "^8.16.0"
   }
 }

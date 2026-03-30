@@ -1,0 +1,127 @@
+{
+  "id": "okx",
+  "name": "OKX Trading",
+  "version": "1.0.0",
+  "description": "Build your own OKX perpetual swap trading dashboard",
+
+  "adapter":  "./adapter.js",
+  "stores":   ["./store/orders.js", "./store/candles.js", "./store/analysis.js"],
+  "actions":  ["./actions/market.js", "./actions/trading.js", "./actions/account.js", "./actions/analysis.js"],
+  "prompts": {
+    "system":    "./prompts/system.md",
+    "analysis":  "./prompts/analysis.js",
+    "tracking":  "./prompts/tracking.js",
+    "postmortem":"./prompts/postmortem.js"
+  },
+
+  "capabilities": {
+    "market.ticker": {
+      "label": "Real-time Price",
+      "description": "BTC/USDT price, 24h change, volume",
+      "stage": "observe",
+      "component": "ticker",
+      "refresh": { "event": "fast", "interval": 5000 }
+    },
+    "market.candles": {
+      "label": "Candlestick Chart",
+      "description": "Multi-timeframe K-line chart with crosshair",
+      "stage": "observe",
+      "component": "chart",
+      "refresh": { "event": "candles", "interval": 600000 }
+    },
+    "account.balance": {
+      "label": "Account Balance",
+      "description": "Total equity, available balance, currency breakdown",
+      "stage": "observe",
+      "component": "balance",
+      "refresh": { "event": "slow", "interval": 60000 }
+    },
+    "trading.positions": {
+      "label": "Position Management",
+      "description": "View and close/reduce current positions",
+      "stage": "trade",
+      "component": "positions",
+      "requires": ["market.ticker"],
+      "refresh": { "event": "slow", "interval": 60000 }
+    },
+    "trading.orders": {
+      "label": "Place Orders",
+      "description": "Market/limit orders with SL/TP and leverage",
+      "stage": "trade",
+      "component": "order-panel",
+      "requires": ["market.ticker"]
+    },
+    "trading.open-orders": {
+      "label": "Open Orders",
+      "description": "Pending orders with cancel/amend",
+      "stage": "trade",
+      "component": "open-orders",
+      "refresh": { "event": "orders", "interval": 10000 }
+    },
+    "analysis.technical": {
+      "label": "Technical Analysis",
+      "description": "Multi-timeframe indicators: RSI, MACD, BB, StochRSI, ADX, S/R",
+      "stage": "understand",
+      "component": "analysis",
+      "requires": ["market.candles"]
+    },
+    "analysis.ai-assess": {
+      "label": "AI Market Assessment",
+      "description": "Claude analyzes signals and gives trading advice",
+      "stage": "optimize",
+      "component": "claude-insights",
+      "requires": ["analysis.technical"]
+    },
+    "analysis.position-track": {
+      "label": "Position Tracking",
+      "description": "AI monitors positions and suggests SL/TP adjustments",
+      "stage": "optimize",
+      "component": "position-track",
+      "requires": ["trading.positions", "analysis.technical"],
+      "refresh": { "event": "postrack", "interval": 180000 }
+    },
+    "review.history": {
+      "label": "Order History",
+      "description": "Past trades with P&L",
+      "stage": "optimize",
+      "component": "history",
+      "refresh": { "event": "slow", "interval": 60000 }
+    },
+    "review.postmortem": {
+      "label": "Trade Postmortem",
+      "description": "AI reviews past trades with chart context",
+      "stage": "optimize",
+      "component": "trade-review",
+      "requires": ["review.history", "market.candles"]
+    }
+  },
+
+  "journey": {
+    "stages": [
+      {
+        "id": "observe",
+        "label": "Watch the Market",
+        "hint": "Start by observing price action and getting familiar with the data",
+        "defaults": ["market.ticker"]
+      },
+      {
+        "id": "understand",
+        "label": "Read the Signals",
+        "hint": "Add technical analysis to understand what the indicators are telling you",
+        "defaults": ["market.candles", "analysis.technical"]
+      },
+      {
+        "id": "trade",
+        "label": "Start Trading",
+        "hint": "Place your first trade with proper risk management",
+        "defaults": ["trading.positions", "trading.orders", "trading.open-orders"]
+      },
+      {
+        "id": "optimize",
+        "label": "Optimize & Review",
+        "hint": "Use AI insights and trade reviews to improve your strategy",
+        "defaults": ["analysis.ai-assess", "analysis.position-track", "review.history"]
+      }
+    ]
+  }
+}

@@ -1,4 +1,5 @@
 'use strict';
+// Extracted from adapters/base.js
 
 class AdapterError extends Error {
   constructor(message, code = 'API_ERROR') {
