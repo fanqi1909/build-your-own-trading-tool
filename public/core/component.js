@@ -28,8 +28,14 @@ export class Component {
    * Handler is auto-removed when destroy() is called.
    */
   on(event, handler) {
-    this.bus.on(event, handler);
-    this._subscriptions.push({ event, handler });
+    const safe = (data) => {
+      try { handler(data); }
+      catch (err) {
+        console.error(`[${this.constructor.id || 'component'}] error in "${event}" handler:`, err);
+      }
+    };
+    this.bus.on(event, safe);
+    this._subscriptions.push({ event, handler: safe });
   }
 
   /**

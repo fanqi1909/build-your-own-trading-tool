@@ -72,6 +72,9 @@ class Engine {
     // Serve node_modules for client-side libraries (e.g. lightweight-charts)
     this._app.use('/node_modules', express.static(path.join(this.pluginDir, '..', '..', 'node_modules')));
 
+    // Expose plugin manifest to client-side builder
+    this._app.get('/api/manifest', (req, res) => res.json(this.manifest));
+
     this._server = http.createServer(this._app);
     this.ws = new WsServer(this._server, this.bus);
 

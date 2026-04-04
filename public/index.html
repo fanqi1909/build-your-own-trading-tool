@@ -3,33 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trading Tool Builder</title>
+  <title>Trading Dashboard</title>
   <link rel="stylesheet" href="/core/theme.css">
 </head>
 <body>
+
+  <!-- Use mode: dashboard + controls bar -->
   <div id="app">
-
-    <!-- AI Chat — always visible -->
-    <aside id="chat-panel">
-      <div class="chat-header">
-        <span id="status"></span>
-        <span>AI Assistant</span>
-      </div>
-      <div class="chat-body">
-        <p class="chat-hint">
-          <strong>Chat coming in Phase 4.</strong><br><br>
-          For now, open the browser console and try:<br><br>
-          <code>app.layout.add('ticker')</code><br>
-          <code>app.layout.remove('ticker')</code><br>
-          <code>app.layout.list()</code>
-        </p>
-      </div>
-    </aside>
-
-    <!-- Dynamic component grid — managed by LayoutManager -->
+    <div id="app-controls">
+      <span id="status" title="WebSocket"></span>
+      <button id="build-btn" title="Build Dashboard">⚙</button>
+    </div>
     <main id="layout-grid"></main>
-
   </div>
+
+  <!-- Chat: floating trigger + slide-in panel (all modes) -->
+  <button id="chat-trigger" title="AI Assistant">✦</button>
+  <div id="chat-backdrop"></div>
+  <aside id="chat-panel"></aside>
+
+  <!-- Build mode: fullscreen overlay -->
+  <div id="builder-overlay" hidden>
+    <div id="builder-panel"></div>
+  </div>
+
   <script type="module" src="/core/app.js"></script>
 </body>
 </html>

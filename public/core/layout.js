@@ -42,8 +42,15 @@ export class LayoutManager {
     // Dynamically import the component module from the plugin
     let ComponentClass = await this._importComponent(componentId);
 
-    const instance = new ComponentClass(el, this.bus, {});
-    await instance.init();
+    let instance;
+    try {
+      instance = new ComponentClass(el, this.bus, {});
+      await instance.init();
+    } catch (err) {
+      console.error(`[layout] ${componentId} failed to init:`, err);
+      el.innerHTML = `<div class="panel__error">⚠ ${componentId} failed to load<br><small>${err.message}</small></div>`;
+      instance = { destroy: () => {} };
+    }
 
     this._panels.set(componentId, { component: instance, el });
     this._layout.push({ id: componentId, position });

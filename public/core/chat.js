@@ -192,13 +192,6 @@ export class ChatPanel {
     const s = document.createElement('style');
     s.id = id;
     s.textContent = `
-      #chat-panel {
-        display: flex; flex-direction: column;
-        border-right: 1px solid var(--border);
-        background: var(--bg);
-        height: 100vh;
-        flex-shrink: 0;
-      }
       .chat { display: flex; flex-direction: column; height: 100%; }
 
       .chat__header {
