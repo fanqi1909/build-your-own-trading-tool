@@ -13,10 +13,13 @@
 async function run() {
   const { RULES, getSuggestions } = await import('../public/core/suggestions.js');
 
+  const realizedRules = RULES.map(r => ({
+    ...r,
+    action: { type: 'enable-component', id: r.target },
+  }));
+
   // ── 5.1 Rules cover all journey transitions ──────────────────────────────
-
   const REQUIRED_STAGES = ['observe', 'observe→understand', 'understand→trade', 'trade→optimize'];
-
   const coveredStages = new Set(RULES.map(r => r.stage));
   let pass51 = true;
   for (const stage of REQUIRED_STAGES) {
@@ -30,11 +33,9 @@ async function run() {
   }
 
   // ── 5.2 Dismissed suggestions are not returned ───────────────────────────
-
   {
-    const enabled   = []; // triggers 'start' rule
+    const enabled   = [];
     const dismissed = new Set();
-
     const before = getSuggestions(enabled, dismissed);
     if (!before.find(s => s.id === 'start')) {
       console.error('[5.2] FAIL — "start" rule not triggered for empty layout');
@@ -50,10 +51,9 @@ async function run() {
   }
 
   // ── 5.3 Suggestion shape is valid ───────────────────────────────────────
-
   {
     let pass53 = true;
-    for (const rule of RULES) {
+    for (const rule of realizedRules) {
       if (typeof rule.text !== 'string' || !rule.text) {
         console.error(`[5.3] FAIL — rule "${rule.id}" missing text`);
         pass53 = false;
@@ -68,7 +68,6 @@ async function run() {
       }
     }
 
-    // getSuggestions on an empty layout returns valid objects
     const suggestions = getSuggestions([], new Set());
     for (const s of suggestions) {
       if (!s.text || !s.action || !s.id) {
