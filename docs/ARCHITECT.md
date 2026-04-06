@@ -1,8 +1,10 @@
 # OKX Trade Dashboard — Architecture
 
+> Legacy architecture note: this document describes the earlier monolithic OKX dashboard. For the current plugin-based, tabbed Build/Use workspace architecture, start with `README.md` and `docs/ARCHITECTURE_PLAN.md`.
+
 ## 总览
 
-实时 BTC 永续合约交易看板。单进程 Node.js 服务，通过 WebSocket 向浏览器推送行情、持仓、技术分析和 AI 建议。
+早期版本是一个实时 BTC 永续合约交易看板。单进程 Node.js 服务，通过 WebSocket 向浏览器推送行情、持仓、技术分析和 AI 建议。
 
 ```
 Browser (index.html)

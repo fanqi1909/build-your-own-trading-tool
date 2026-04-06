@@ -1,6 +1,6 @@
 # Architecture Plan: AI-Driven Trading Tool Builder
 
-> Status: Draft v1 | 2026-03-30
+> Status: Refactor largely implemented; doc now serves as architecture reference and roadmap | 2026-04-06
 
 ## Vision
 

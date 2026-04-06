@@ -4,21 +4,23 @@
 
 > **⚠️ For educational purposes only. Not financial advice. Use at your own risk.**
 
-Build your own AI-assisted OKX trading workspace — modular dashboard tabs, technical analysis, order execution, trade review, and Claude-powered recommendations, all in your browser.
+This project is now best thought of as an **AI-assisted OKX trading workspace**. Instead of one fixed dashboard, you can build a tabbed trading environment in the browser: edit the current tab in Build mode, use it in a cleaner Use mode, and let Claude recommend which modules or tab structures make sense.
 
 ![Build Your Own Trade](docs/screenshot.png)
 
 ## What It Does
 
-This project gives you a browser-based trading workspace with:
+The current app supports:
 
-- **Modular dashboard panels** — ticker, chart, balance, positions, orders, analysis, history, review
-- **Tabbed workspaces** — split your setup into Watch / Trade / Review tabs
-- **Build / Use flow** — edit the active tab in Build mode, then switch back to a cleaner Use mode
-- **AI recommendations** — Claude suggests which modules fit the current tab and which tab structures make sense
-- **Trade execution** — place, amend, and cancel OKX orders
-- **Technical analysis** — RSI, MACD, Bollinger Bands, support/resistance, and more
-- **Trade review** — order history + AI postmortem workflow
+- **Modular trading panels** — ticker, chart, balance, positions, orders, analysis, history, trade review, and more
+- **Tabbed workspaces** — split your flow into Watch / Trade / Review tabs
+- **Build / Use workflow**
+  - **Build mode**: edit the active tab
+  - **Use mode**: use the workspace with fewer editing affordances
+- **AI recommendations** — suggest what the current tab is missing and which tabs are worth creating
+- **Trade execution** — place, amend, cancel, and close OKX orders
+- **Technical analysis** — RSI, MACD, Bollinger Bands, support/resistance, and other signal summaries
+- **Trade review** — history + AI-assisted postmortem flow
 
 ## Prerequisites
 
@@ -38,13 +40,13 @@ node server.js
 # Open http://localhost:3000
 ```
 
-No build step is required.
-
-If you want auto-reload during development:
+For development with auto-reload:
 
 ```bash
 npm run dev
 ```
+
+There is **no frontend build step**. The UI uses vanilla JS + ES modules.
 
 ## Docker Start
 
@@ -60,17 +62,17 @@ docker compose up
 
 ```text
 Browser
-  ├── public/core/app.js          # app shell, build/use mode, tabs, chat overlay
+  ├── public/core/app.js          # app shell, Build/Use mode, tabs, chat overlay
   ├── public/core/layout.js       # tabbed layout state + mounted components
   ├── public/core/builder.js      # builder side panel
   ├── public/core/chat.js         # AI chat UI
-  ├── public/core/suggestions.js  # recommendations + suggested tab helpers
+  ├── public/core/suggestions.js  # recommendations + suggested tabs
   └── plugins/okx/components/*    # self-contained UI panels
 
 server.js
   └── core/engine.js              # plugin host, static serving, ws server
       └── plugins/okx/
-          ├── actions/            # market/account/trading/analysis actions
+          ├── actions/            # market / account / trading / analysis
           ├── store/              # DuckDB + JSON persistence
           ├── prompts/            # Claude prompts
           ├── adapter.js          # OKX CLI integration
@@ -82,11 +84,11 @@ server.js
 ```text
 build-your-own-trading-tool/
 ├── core/                    # domain-agnostic runtime
-├── plugins/okx/             # all OKX-specific logic
+├── plugins/okx/             # OKX plugin implementation
 ├── public/
 │   ├── index.html           # minimal shell
-│   └── core/                # client app framework (tabs, layout, chat, builder)
-├── tests/                   # phased architecture and layout tests
+│   └── core/                # client app framework: tabs, layout, builder, chat
+├── tests/                   # unit, integration, and phased layout tests
 ├── docs/ARCHITECTURE_PLAN.md
 └── server.js
 ```
@@ -100,23 +102,23 @@ build-your-own-trading-tool/
 | Position tracking | JSON | `data/postrack-{mode}.json` |
 | Analysis history | JSON | `data/analysis-{mode}.json` |
 
-## Key Concepts
+## Core Concepts
 
 ### Build vs Use
-- **Use mode**: cleaner day-to-day dashboard usage
-- **Build mode**: edit the active tab, add/remove panels, create suggested tabs
+- **Use mode**: cleaner day-to-day usage
+- **Build mode**: edit the current tab, add/remove panels, create suggested tabs
 
 ### Tabs
-Each tab has its own module set and removed-history state. Example structure:
+Each tab has its own module set and recently removed state. A typical structure is:
 - **Watch** — ticker, chart, analysis
 - **Trade** — positions, order panel, open orders
 - **Review** — history, trade review, Claude insights
 
 ### AI Role
-AI is best used here as a **planner/recommender**:
-- recommend which modules belong in the current tab
-- recommend when to create a new Watch / Trade / Review tab
-- explain what a missing panel is for
+AI is best used here as a **planner / recommender**:
+- recommend which modules fit the current tab
+- recommend when to create a Watch / Trade / Review tab
+- explain where a component fits best
 
 The user still controls the final organization and layout.
 
@@ -126,7 +128,7 @@ The user still controls the final organization and layout.
 npm test
 ```
 
-Useful focused checks:
+Focused checks that are useful during architecture/UI work:
 
 ```bash
 node tests/phase5.test.js
@@ -136,12 +138,12 @@ node tests/phase6-layout.test.js
 ## Notes
 
 - Demo mode is the safest default for experimentation
-- There is no frontend build pipeline — this is vanilla JS + ES modules
-- If `okx` works in your terminal but not from Node, make sure the CLI is installed and on PATH
+- The active exchange integration path is **OKX CLI**
+- If `okx` works in your terminal but not from Node, the usual cause is PATH / CLI installation mismatch
 
 ## GitHub
 
-Remote repo:
+Remote repository:
 
 ```text
 https://github.com/fanqi1909/build-your-own-trading-tool
