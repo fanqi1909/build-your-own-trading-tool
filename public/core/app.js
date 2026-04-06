@@ -13,13 +13,14 @@ const UI_MODE_KEY = 'uiMode';
 
 class App {
   constructor() {
-    this.bus     = new EventBus();
-    this.ws      = new WsClient(`ws://${location.host}`, this.bus);
-    this.layout  = null;
-    this.chat    = null;
-    this.builder = null;
+    this.bus         = new EventBus();
+    this.ws          = new WsClient(`ws://${location.host}`, this.bus);
+    this.layout      = null;
+    this.chat        = null;
+    this.builder     = null;
     this.suggestions = null;
-    this.catalog = [];
+    this.catalog     = [];
+    this.uiMode      = 'use';
   }
 
   async init() {
@@ -31,7 +32,7 @@ class App {
 
     this.catalog = await this._loadCatalog();
 
-    this.builder = new BuilderPanel(document.getElementById('builder-overlay'), this.layout, this.catalog, () => this._setUiMode('use'));
+    this.builder = new BuilderPanel(document.getElementById('builder-panel'), this.layout, this.catalog, () => this._setUiMode('use'));
     await this.builder.init();
     this._initBuildButton();
 
@@ -44,14 +45,20 @@ class App {
     this.suggestions = new SuggestionEngine(this.bus, this.layout, this.catalog);
     this.suggestions.init();
 
-    this._renderUseControls();
     this.bus.on('layout:changed', () => {
       this.builder.render();
-      this._renderUseControls();
+      this._renderTabsBar();
+      this._renderLayoutDecorations();
+    });
+    this.bus.on('layout:tab-changed', () => {
+      this.builder.render();
+      this._renderTabsBar();
+      this._renderLayoutDecorations();
     });
 
     const savedMode = localStorage.getItem(UI_MODE_KEY) || 'use';
     this._setUiMode(savedMode, { skipSave: true });
+    this._renderTabsBar();
 
     window.app = this;
   }
@@ -68,15 +75,21 @@ class App {
   }
 
   _setUiMode(mode, { skipSave = false } = {}) {
-    if (mode === 'build') this.builder.show();
-    else this.builder.hide();
+    this.uiMode = mode;
+    document.body.dataset.uiMode = mode;
+
+    const builderPanel = document.getElementById('builder-panel');
+    if (builderPanel) builderPanel.hidden = mode !== 'build';
+
+    this._renderLayoutDecorations();
+    this.bus.emit('ui:mode-changed', { mode });
     if (!skipSave) localStorage.setItem(UI_MODE_KEY, mode);
   }
 
   _initBuildButton() {
     const btn = document.getElementById('build-btn');
     if (!btn) return;
-    btn.addEventListener('click', () => this._setUiMode('build'));
+    btn.addEventListener('click', () => this._setUiMode(this.uiMode === 'build' ? 'use' : 'build'));
   }
 
   _initChatOverlay() {
@@ -102,11 +115,47 @@ class App {
     backdrop.addEventListener('click', () => close());
   }
 
-  _renderUseControls() {
+  _renderTabsBar() {
+    const el = document.getElementById('tabs-bar');
+    if (!el) return;
+    const tabs = this.layout.listTabs();
+    const activeTabId = this.layout.getActiveTabId();
+
+    el.innerHTML = `
+      <div class="tabs">
+        ${tabs.map(tab => `
+          <div class="tabs__item ${tab.id === activeTabId ? 'is-active' : ''}" data-tab-id="${tab.id}">
+            <button class="tabs__switch" data-tab-id="${tab.id}">${tab.title}</button>
+            <button class="tabs__rename" data-tab-id="${tab.id}" title="Rename">✎</button>
+            ${tabs.length > 1 ? `<button class="tabs__remove" data-tab-id="${tab.id}" title="Remove">×</button>` : ''}
+          </div>
+        `).join('')}
+        <button class="tabs__add" id="tab-add-btn">＋ New Tab</button>
+      </div>
+    `;
+
+    el.querySelectorAll('.tabs__switch').forEach(btn => btn.addEventListener('click', () => this.layout.switchTab(btn.dataset.tabId)));
+    el.querySelectorAll('.tabs__rename').forEach(btn => btn.addEventListener('click', () => {
+      const tab = tabs.find(t => t.id === btn.dataset.tabId);
+      const title = prompt('Rename tab', tab?.title || '');
+      if (title) this.layout.renameTab(btn.dataset.tabId, title);
+    }));
+    el.querySelectorAll('.tabs__remove').forEach(btn => btn.addEventListener('click', () => {
+      if (confirm('Delete this tab?')) this.layout.removeTab(btn.dataset.tabId);
+    }));
+    el.querySelector('#tab-add-btn')?.addEventListener('click', async () => {
+      await this.layout.addTab(`Tab ${tabs.length + 1}`);
+    });
+  }
+
+  _renderLayoutDecorations() {
     const grid = document.getElementById('layout-grid');
     if (!grid) return;
 
     grid.querySelectorAll('.panel__remove-btn, .panel--add-widget').forEach(el => el.remove());
+    grid.classList.toggle('layout-grid--build', this.uiMode === 'build');
+
+    if (this.uiMode !== 'build') return;
 
     for (const id of this.layout.list()) {
       const panel = grid.querySelector(`.panel--${id}`);
@@ -122,7 +171,10 @@ class App {
     const add = document.createElement('button');
     add.className = 'panel panel--add-widget';
     add.innerHTML = '<div class="panel__add-widget">＋ Add widget</div>';
-    add.addEventListener('click', () => this._setUiMode('build'));
+    add.addEventListener('click', () => {
+      this._setUiMode('build');
+      document.getElementById('builder-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     grid.appendChild(add);
   }
 

@@ -4,80 +4,94 @@
 
 > **⚠️ For educational purposes only. Not financial advice. Use at your own risk.**
 
-Build your own trading system on OKX — order execution, position tracking, technical analysis, AI-powered signals, and post-trade review, all in your browser.
+Build your own AI-assisted OKX trading workspace — modular dashboard tabs, technical analysis, order execution, trade review, and Claude-powered recommendations, all in your browser.
 
 ![Build Your Own Trade](docs/screenshot.png)
 
-## What You'll Build
+## What It Does
 
-A single-page web dashboard that connects to your OKX account and provides:
+This project gives you a browser-based trading workspace with:
 
-- **Live price ticker** — BTC-USDT updates every 5 seconds
-- **K-line charts** — Canvas-rendered candlestick charts with action markers
-- **Position tracking** — Real-time P&L, leverage, liquidation price
-- **Technical analysis** — RSI, MACD, Bollinger Bands via Python script
-- **AI insights** — Claude-powered market assessment and position advice
-- **Order management** — Place, cancel, and amend orders from the dashboard
+- **Modular dashboard panels** — ticker, chart, balance, positions, orders, analysis, history, review
+- **Tabbed workspaces** — split your setup into Watch / Trade / Review tabs
+- **Build / Use flow** — edit the active tab in Build mode, then switch back to a cleaner Use mode
+- **AI recommendations** — Claude suggests which modules fit the current tab and which tab structures make sense
+- **Trade execution** — place, amend, and cancel OKX orders
+- **Technical analysis** — RSI, MACD, Bollinger Bands, support/resistance, and more
+- **Trade review** — order history + AI postmortem workflow
 
 ## Prerequisites
 
-- OKX API credentials (create at [OKX](https://www.okx.com), demo mode recommended)
-- Docker & Docker Compose **or** Node.js >= 18 + Python 3
+- OKX API credentials (demo mode recommended)
+- Node.js >= 18
+- Python 3
+- OKX Trade CLI
 
-## Quick Start (Docker)
-
-```bash
-# 1. Install OKX Trade CLI and configure credentials (one-time setup)
-npm install -g @okx_ai/okx-trade-cli
-okx config init    # interactive wizard, creates ~/.okx/config.toml
-
-# 2. Start
-docker compose up
-
-# Open http://localhost:3000
-```
-
-Your `~/.okx/config.toml` is mounted read-only into the container — no need to duplicate credentials. Edit any source file locally — changes are **volume-mounted** and picked up automatically (Node.js `--watch` mode).
-
-## Local Development (without Docker)
+## Local Start
 
 ```bash
-# Prerequisites: Node.js 20 (recommended), Python 3, OKX Trade CLI
-# Note: Node 25+ may fail to compile duckdb native module. Use Docker or Node 20.
+npm install
 npm install -g @okx_ai/okx-trade-cli
 okx config init
 
-npm install
-npm run dev        # starts with --watch for auto-reload
+node server.js
 # Open http://localhost:3000
 ```
 
-The dashboard starts in **demo mode** by default — safe for experimentation with paper trading.
+No build step is required.
 
-## Architecture
+If you want auto-reload during development:
 
-```
-Browser (index.html)
-    │  WebSocket
-    ▼
-server.js  ──── adapters/okx-cli.js ──── okx CLI ──── OKX API
-    │
-    ├── lib/store.js   (DuckDB + JSON persistence)
-    ├── lib/ai.js      (Claude CLI integration)
-    └── analyze.py     (Technical indicators)
+```bash
+npm run dev
 ```
 
-### Refresh Schedule
+## Docker Start
 
-| Data | Interval | Source |
-|------|----------|--------|
-| Price ticker | 5s | `market ticker` |
-| Balance & positions | 60s | `account balance` + `swap positions` |
-| Open orders | 10s | `swap orders` |
-| K-lines + analysis | 10min | `market candles` → `analyze.py` → Claude |
-| Position tracking | 3min | Claude assessment |
+```bash
+npm install -g @okx_ai/okx-trade-cli
+okx config init
 
-### Data Storage
+docker compose up
+# Open http://localhost:3000
+```
+
+## Current Architecture
+
+```text
+Browser
+  ├── public/core/app.js          # app shell, build/use mode, tabs, chat overlay
+  ├── public/core/layout.js       # tabbed layout state + mounted components
+  ├── public/core/builder.js      # builder side panel
+  ├── public/core/chat.js         # AI chat UI
+  ├── public/core/suggestions.js  # recommendations + suggested tab helpers
+  └── plugins/okx/components/*    # self-contained UI panels
+
+server.js
+  └── core/engine.js              # plugin host, static serving, ws server
+      └── plugins/okx/
+          ├── actions/            # market/account/trading/analysis actions
+          ├── store/              # DuckDB + JSON persistence
+          ├── prompts/            # Claude prompts
+          ├── adapter.js          # OKX CLI integration
+          └── manifest.json       # capabilities + journey metadata
+```
+
+## Project Structure
+
+```text
+build-your-own-trading-tool/
+├── core/                    # domain-agnostic runtime
+├── plugins/okx/             # all OKX-specific logic
+├── public/
+│   ├── index.html           # minimal shell
+│   └── core/                # client app framework (tabs, layout, chat, builder)
+├── tests/                   # phased architecture and layout tests
+├── docs/ARCHITECTURE_PLAN.md
+└── server.js
+```
+
+## Data Storage
 
 | Type | Engine | File |
 |------|--------|------|
@@ -86,75 +100,49 @@ server.js  ──── adapters/okx-cli.js ──── okx CLI ──── OK
 | Position tracking | JSON | `data/postrack-{mode}.json` |
 | Analysis history | JSON | `data/analysis-{mode}.json` |
 
-## File Structure
+## Key Concepts
 
-```
-trade-dashboard/
-├── server.js               # Entry point — Express + WebSocket + timers
-├── analyze.py              # Technical analysis (reads candles, outputs indicators)
-├── adapters/
-│   ├── base.js             # AdapterError + type definitions (JSDoc)
-│   ├── okx-cli.js          # CLI adapter (default) — shells out to `okx` command
-│   └── okx-rest.js         # REST adapter (placeholder for future)
-├── lib/
-│   ├── store.js            # Data layer — orders, positions, candles (DuckDB)
-│   └── ai.js               # AI layer — Claude spawn helper + prompt building
-├── public/
-│   └── index.html          # Single-file frontend (~2000 lines, vanilla JS + Canvas)
-└── tests/
-    ├── adapters.test.js
-    ├── store.test.js
-    ├── ai.test.js
-    └── server.test.js      # Integration test (requires running server)
-```
+### Build vs Use
+- **Use mode**: cleaner day-to-day dashboard usage
+- **Build mode**: edit the active tab, add/remove panels, create suggested tabs
 
-## Configuration
+### Tabs
+Each tab has its own module set and removed-history state. Example structure:
+- **Watch** — ticker, chart, analysis
+- **Trade** — positions, order panel, open orders
+- **Review** — history, trade review, Claude insights
 
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `EXCHANGE_ADAPTER` | `okx-cli` | Adapter to use (`okx-cli` or `okx-rest`) |
-| `ANALYZE_PY` | `./analyze.py` | Path to technical analysis script |
-| `PORT` | `3000` | Server port (hardcoded, edit `server.js` to change) |
+### AI Role
+AI is best used here as a **planner/recommender**:
+- recommend which modules belong in the current tab
+- recommend when to create a new Watch / Trade / Review tab
+- explain what a missing panel is for
+
+The user still controls the final organization and layout.
 
 ## Testing
 
 ```bash
-# Unit tests (no external dependencies)
 npm test
-
-# Integration tests (requires okx CLI + port 3000 available)
-npm run test:integration
 ```
 
-## Demo / Live Mode
-
-Switch between demo and live mode from the dashboard UI. Data is stored separately per mode — no cross-contamination.
-
-## How to Extend
-
-### Add a new exchange adapter
-
-Create `adapters/my-exchange.js` exporting the same interface as `okx-cli.js` (`fetchTicker`, `fetchBalance`, `fetchPositions`, etc.), then set:
+Useful focused checks:
 
 ```bash
-EXCHANGE_ADAPTER=my-exchange docker compose up
+node tests/phase5.test.js
+node tests/phase6-layout.test.js
 ```
 
-See `adapters/base.js` for the full interface definition and `adapters/okx-rest.js` for a scaffold.
+## Notes
 
-### Add technical indicators
+- Demo mode is the safest default for experimentation
+- There is no frontend build pipeline — this is vanilla JS + ES modules
+- If `okx` works in your terminal but not from Node, make sure the CLI is installed and on PATH
 
-Edit `analyze.py` — it reads candle data from stdin and prints indicator text to stdout. Add any indicator your strategy needs (e.g., OBV, Ichimoku). The output is passed directly to the AI layer and displayed in the dashboard.
+## GitHub
 
-### Customize the AI prompts
+Remote repo:
 
-Edit `lib/ai.js` — `buildClaudePrompt()` controls what the AI sees for market assessment, and `buildPositionTrackPrompt()` controls position advice. Adjust the prompt to match your trading style.
-
-### Customize the frontend
-
-Edit `public/index.html` — it's a single vanilla JS file with no build step. Add new tabs, charts, or widgets directly. Changes are picked up automatically via volume mount.
-
-## Learn More
-
-- [Architecture deep-dive](docs/ARCHITECT.md) — full data flow, design decisions, and module responsibilities
-- [OKX Trade CLI docs](https://github.com/okx/agent-tradekit/blob/master/docs/cli-reference.md) — all available CLI commands
+```text
+https://github.com/fanqi1909/build-your-own-trading-tool
+```

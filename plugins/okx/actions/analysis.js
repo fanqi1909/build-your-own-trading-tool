@@ -15,8 +15,6 @@ const BAR_MS = {
 function register(ctx) {
   const { adapter, bus, cache, stores, refresh, getMode } = ctx;
 
-  // ── Auto-assess: run Claude on latest analysis entry ───────────────────────
-
   async function autoClaudeAssess() {
     const hist   = stores.analysis.analysisHistory();
     const latest = hist[hist.length - 1];
@@ -30,8 +28,6 @@ function register(ctx) {
       console.log('[claude] auto-assess done');
     } catch (e) { console.error('[claude] auto-assess error', e.message); }
   }
-
-  // ── Position track: Claude advises on open positions ───────────────────────
 
   async function positionTrackRefresh() {
     if (!cache.positions?.length) return;
@@ -48,8 +44,6 @@ function register(ctx) {
       console.log('[posTrack] done');
     } catch (e) { console.error('[posTrack] error', e.message); }
   }
-
-  // ── Analysis refresh: run analyze.py + update history ──────────────────────
 
   async function analysisRefresh(inst = 'BTC-USDT', bar = '15m') {
     try {
@@ -78,19 +72,14 @@ function register(ctx) {
     }
   }
 
-  // Expose on ctx.refresh
   refresh.analysis = analysisRefresh;
   refresh.postrack = positionTrackRefresh;
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
 
   function findNearestAnalysis(ts) {
     const hist   = stores.analysis.analysisHistories[getMode()];
     const before = hist.filter(e => e.ts <= ts);
     return before.length ? before[before.length - 1] : null;
   }
-
-  // ── Connect handler: send cached analysis + postrack history ────────────────
 
   ctx.ws.registerConnect((ws) => {
     const aHist = stores.analysis.analysisHistory();
@@ -106,15 +95,10 @@ function register(ctx) {
     }
   });
 
-  // ── Action handlers ─────────────────────────────────────────────────────────
-
   const actions = {
-
     async askClaude(msg, ws) {
       const aHist = stores.analysis.analysisHistory();
-      const entry = msg.analysisTs
-        ? aHist.find(e => e.ts === msg.analysisTs)
-        : aHist[aHist.length - 1];
+      const entry = msg.analysisTs ? aHist.find(e => e.ts === msg.analysisTs) : aHist[aHist.length - 1];
       if (!entry) return { type: 'claudeError', error: '没有分析数据' };
       ws.send(JSON.stringify({ type: 'claudeThinking' }));
       try {
@@ -179,22 +163,28 @@ function register(ctx) {
     },
 
     async chat(msg, ws) {
-      const { message, enabledIds = [] } = msg;
+      const { message, enabledIds = [], dashboardContext = null } = msg;
       if (!message?.trim()) return;
       ws.send(JSON.stringify({ type: 'chatThinking' }));
 
-      // Prefix with current layout context so Claude always knows what's enabled
-      const ctxMessage = `[Layout: ${enabledIds.length ? enabledIds.join(', ') : 'empty'}]\n\n${message}`;
+      let layoutPrefix;
+      if (dashboardContext?.tabs?.length) {
+        const lines = dashboardContext.tabs.map(tab => `- ${tab.title}: ${tab.enabledIds?.length ? tab.enabledIds.join(', ') : 'empty'}`);
+        const active = dashboardContext.tabs.find(tab => tab.id === dashboardContext.activeTabId);
+        layoutPrefix = `[Dashboard Tabs:\n${lines.join('\n')}\nActive Tab: ${active?.title || 'unknown'}]`;
+      } else {
+        layoutPrefix = `[Layout: ${enabledIds.length ? enabledIds.join(', ') : 'empty'}]`;
+      }
+
+      const ctxMessage = `${layoutPrefix}\n\n${message}`;
       let fullResponse = '';
 
       try {
         await ctx._chatSession.send(ctxMessage, (chunk) => {
           fullResponse += chunk;
-          // Stream chunks to client; client strips action tags for display
           ws.send(JSON.stringify({ type: 'chatChunk', text: chunk }));
         });
 
-        // Parse action tags from full response and broadcast each action
         const actions = ctx._parseActions(fullResponse);
         for (const action of actions) {
           ws.send(JSON.stringify({ type: 'chatAction', ...action }));
@@ -210,16 +200,15 @@ function register(ctx) {
       ctx._chatSession.reset();
       return { type: 'chatReset' };
     },
-
   };
 
-  // ── Timers ──────────────────────────────────────────────────────────────────
-
-  const timers = [
-    { name: 'postrack', fn: positionTrackRefresh, intervalMs: 3 * 60 * 1000 },
-  ];
-
-  return { actions, timers, onReady: async () => {} };
+  return {
+    actions,
+    timers: [
+      { name: 'postrack', fn: positionTrackRefresh, intervalMs: 180000 },
+    ],
+    onReady: async () => {},
+  };
 }
 
 module.exports = { register };

@@ -1,7 +1,7 @@
 /**
- * public/core/builder.js — Dashboard builder panel
+ * public/core/builder.js — Dashboard builder side panel
  */
-import { groupBuilderSections } from './suggestions.js';
+import { groupBuilderSections, getSuggestedTabs } from './suggestions.js';
 
 const PRESETS = [
   { id: 'watch',   icon: '👁', label: 'Watch Market',  desc: 'Price ticker + candlestick chart', components: ['ticker', 'chart'] },
@@ -11,8 +11,8 @@ const PRESETS = [
 ];
 
 export class BuilderPanel {
-  constructor(overlayEl, layout, catalog, onDone) {
-    this.el      = overlayEl;
+  constructor(panelEl, layout, catalog, onDone) {
+    this.el      = panelEl;
     this.layout  = layout;
     this.catalog = catalog;
     this.onDone  = onDone;
@@ -37,37 +37,41 @@ export class BuilderPanel {
   }
 
   render() {
-    const panel = this.el.querySelector('#builder-panel');
-    if (!panel) return;
+    if (!this.el) return;
 
-    const { recommended, active, available } = groupBuilderSections(
+    const activeTab = this.layout.getActiveTab();
+    const suggestedTabs = getSuggestedTabs(this.layout.listTabs());
+    const { recommended, available, removed } = groupBuilderSections(
       this.catalog,
       this.layout.list(),
       this.layout.listRecentlyRemoved()
     );
 
-    panel.innerHTML = `
+    this.el.innerHTML = `
       <div class="builder__header">
-        <div class="builder__title">Build Your Dashboard</div>
-        <button class="builder__done" id="builder-done">Done →</button>
+        <div>
+          <div class="builder__title">Build Your Dashboard</div>
+          <div class="builder__section-title">Editing tab: ${activeTab.title}</div>
+        </div>
+        <button class="builder__done" id="builder-done">Done</button>
       </div>
 
       <div class="builder__section">
-        <div class="builder__section-title">Recommended</div>
-        <div class="builder__components builder__components--recommended">
-          ${recommended.map(item => this._card(item, 'add')).join('') || '<div class="builder__empty">Everything recommended is already on your home screen.</div>'}
+        <div class="builder__section-title">AI Suggested Tabs</div>
+        <div class="builder__presets">
+          ${suggestedTabs.map(tab => `
+            <div class="builder__preset builder__preset--tab" data-suggested-tab="${tab.id}">
+              <div class="builder__preset-icon">${tab.icon}</div>
+              <div class="builder__preset-label">${tab.title}</div>
+              <div class="builder__preset-desc">${tab.reason}</div>
+              <button class="builder__component-action builder__component-action--add" data-create-tab="${tab.id}">Create Tab</button>
+            </div>
+          `).join('') || '<div class="builder__empty">You already have the main tab structure.</div>'}
         </div>
       </div>
 
       <div class="builder__section">
-        <div class="builder__section-title">On Your Home Screen</div>
-        <div class="builder__components">
-          ${active.map(item => this._card(item, 'remove')).join('') || '<div class="builder__empty">No cards yet. Start from a recommendation or template.</div>'}
-        </div>
-      </div>
-
-      <div class="builder__section">
-        <div class="builder__section-title">Templates</div>
+        <div class="builder__section-title">Recommended Presets</div>
         <div class="builder__presets">
           ${PRESETS.map(p => `
             <div class="builder__preset" data-preset="${p.id}">
@@ -80,35 +84,56 @@ export class BuilderPanel {
       </div>
 
       <div class="builder__section">
-        <div class="builder__section-title">Available Cards</div>
+        <div class="builder__section-title">AI Suggests For This Tab</div>
+        <div class="builder__components builder__components--recommended">
+          ${recommended.map(item => this._card(item, 'add')).join('') || '<div class="builder__empty">This tab already includes the top recommendations.</div>'}
+        </div>
+      </div>
+
+      <div class="builder__section">
+        <div class="builder__section-title">Available Components</div>
         <div class="builder__components">
-          ${available.map(item => this._card(item, 'add')).join('')}
+          ${available.map(item => this._card(item, 'add')).join('') || '<div class="builder__empty">No more components available.</div>'}
+        </div>
+      </div>
+
+      <div class="builder__section">
+        <div class="builder__section-title">Recently Removed</div>
+        <div class="builder__components">
+          ${removed.map(item => this._card(item, 'restore')).join('') || '<div class="builder__empty">Nothing removed recently.</div>'}
         </div>
       </div>
     `;
 
-    panel.querySelector('#builder-done')?.addEventListener('click', () => this.onDone());
-    panel.querySelectorAll('.builder__preset').forEach(el => el.addEventListener('click', () => this._applyPreset(el.dataset.preset)));
-    panel.querySelectorAll('.builder__component-action').forEach(el => {
+    this.el.querySelector('#builder-done')?.addEventListener('click', () => this.onDone());
+    this.el.querySelectorAll('.builder__preset[data-preset]').forEach(el => el.addEventListener('click', () => this._applyPreset(el.dataset.preset)));
+    this.el.querySelectorAll('[data-create-tab]').forEach(el => el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const suggested = suggestedTabs.find(tab => tab.id === el.dataset.createTab);
+      if (!suggested) return;
+      await this.layout.addTab(suggested.title, suggested.components);
+      this.render();
+    }));
+    this.el.querySelectorAll('.builder__component-action[data-component]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const id = el.dataset.component;
         const action = el.dataset.action;
-        if (action === 'add') this.layout.restore(id).then(() => this.render());
-        if (action === 'remove') { this.layout.remove(id); this.render(); }
+        if (action === 'add' || action === 'restore') this.layout.restore(id).then(() => this.render());
       });
     });
   }
 
   _card(item, action) {
+    const label = action === 'restore' ? 'Restore' : 'Add';
     return `
-      <div class="builder__component ${action === 'remove' ? 'is-active' : ''}" data-component="${item.id}">
+      <div class="builder__component" data-component="${item.id}">
         <div class="builder__component-icon">${item.icon}</div>
         <div class="builder__component-info">
           <div class="builder__component-label">${item.title}</div>
           <div class="builder__component-desc">${item.description}</div>
         </div>
-        <button class="builder__component-action builder__component-action--${action}" data-component="${item.id}" data-action="${action}">${action === 'add' ? 'Add' : 'Remove'}</button>
+        <button class="builder__component-action builder__component-action--${action}" data-component="${item.id}" data-action="${action}">${label}</button>
       </div>
     `;
   }

@@ -3,17 +3,17 @@
  */
 
 export const RULES = [
-  { id: 'start',              stage: 'observe',            when: (en) => en.length === 0,                             target: 'ticker',           text: 'Welcome! Start by watching the BTC price live.', label: 'Add Price Ticker' },
-  { id: 'add-balance',        stage: 'observe',            when: (en) => en.includes('ticker') && !en.includes('balance'),          target: 'balance',          text: 'Add the balance panel to track your account equity.', label: 'Add Balance' },
-  { id: 'add-chart',          stage: 'observe→understand', when: (en) => en.includes('ticker') && !en.includes('chart'),            target: 'chart',            text: 'See price action across timeframes with the candlestick chart.', label: 'Add Chart' },
-  { id: 'add-analysis',       stage: 'understand',         when: (en) => en.includes('chart') && !en.includes('analysis'),          target: 'analysis',         text: 'Read the signals — add technical analysis.', label: 'Add Analysis' },
-  { id: 'start-trading',      stage: 'understand→trade',   when: (en) => en.includes('analysis') && !en.includes('order-panel'),    target: 'order-panel',      text: 'Ready to trade? Add the order panel.', label: 'Add Order Panel' },
-  { id: 'add-positions',      stage: 'trade',              when: (en) => en.includes('order-panel') && !en.includes('positions'),   target: 'positions',        text: 'Track your open positions in real time.', label: 'Add Positions' },
-  { id: 'add-open-orders',    stage: 'trade',              when: (en) => en.includes('order-panel') && !en.includes('open-orders'), target: 'open-orders',      text: 'See and manage your pending limit orders.', label: 'Add Open Orders' },
-  { id: 'add-position-track', stage: 'trade→optimize',     when: (en) => en.includes('positions') && !en.includes('position-track'),target: 'position-track',   text: 'Let AI monitor your positions.', label: 'Enable AI Tracking' },
-  { id: 'add-history',        stage: 'optimize',           when: (en) => en.includes('positions') && !en.includes('history'),       target: 'history',          text: 'Review your past trades and P&L.', label: 'Add Trade History' },
-  { id: 'add-ai-assess',      stage: 'optimize',           when: (en) => en.includes('analysis') && !en.includes('claude-insights'),target: 'claude-insights',  text: 'Get an AI-powered market assessment.', label: 'Add AI Assessment' },
-  { id: 'add-trade-review',   stage: 'optimize',           when: (en) => en.includes('history') && !en.includes('trade-review'),    target: 'trade-review',     text: 'Deep-dive into past trades with AI postmortem.', label: 'Add Trade Review' },
+  { id: 'start',              stage: 'observe',            when: (en) => en.length === 0,                              target: 'ticker',          text: 'Welcome! Start by watching the BTC price live.', label: 'Add Price Ticker' },
+  { id: 'add-balance',        stage: 'observe',            when: (en) => en.includes('ticker') && !en.includes('balance'),           target: 'balance',         text: 'Add the balance panel to track your account equity.', label: 'Add Balance' },
+  { id: 'add-chart',          stage: 'observe→understand', when: (en) => en.includes('ticker') && !en.includes('chart'),             target: 'chart',           text: 'See price action across timeframes with the candlestick chart.', label: 'Add Chart' },
+  { id: 'add-analysis',       stage: 'understand',         when: (en) => en.includes('chart') && !en.includes('analysis'),           target: 'analysis',        text: 'Read the signals — add technical analysis.', label: 'Add Analysis' },
+  { id: 'start-trading',      stage: 'understand→trade',   when: (en) => en.includes('analysis') && !en.includes('order-panel'),     target: 'order-panel',     text: 'Ready to trade? Add the order panel.', label: 'Add Order Panel' },
+  { id: 'add-positions',      stage: 'trade',              when: (en) => en.includes('order-panel') && !en.includes('positions'),    target: 'positions',       text: 'Track your open positions in real time.', label: 'Add Positions' },
+  { id: 'add-open-orders',    stage: 'trade',              when: (en) => en.includes('order-panel') && !en.includes('open-orders'),  target: 'open-orders',     text: 'See and manage your pending limit orders.', label: 'Add Open Orders' },
+  { id: 'add-position-track', stage: 'trade→optimize',     when: (en) => en.includes('positions') && !en.includes('position-track'), target: 'position-track',  text: 'Let AI monitor your positions.', label: 'Enable AI Tracking' },
+  { id: 'add-history',        stage: 'optimize',           when: (en) => en.includes('positions') && !en.includes('history'),        target: 'history',         text: 'Review your past trades and P&L.', label: 'Add Trade History' },
+  { id: 'add-ai-assess',      stage: 'optimize',           when: (en) => en.includes('analysis') && !en.includes('claude-insights'), target: 'claude-insights', text: 'Get an AI-powered market assessment.', label: 'Add AI Assessment' },
+  { id: 'add-trade-review',   stage: 'optimize',           when: (en) => en.includes('history') && !en.includes('trade-review'),     target: 'trade-review',    text: 'Deep-dive into past trades with AI postmortem.', label: 'Add Trade Review' },
 ];
 
 export function getSuggestions(enabledIds, dismissed) {
@@ -48,11 +48,41 @@ export function getRecommendedComponents(catalog, activeIds, removedIds = []) {
 
 export function groupBuilderSections(catalog, activeIds, removedIds = []) {
   const activeSet = new Set(activeIds);
+  const removedSet = new Set(removedIds);
+  const byId = Object.fromEntries(catalog.map(item => [item.id, item]));
   return {
     recommended: getRecommendedComponents(catalog, activeIds, removedIds).slice(0, 6),
     active:      catalog.filter(item => activeSet.has(item.id)),
-    available:   catalog.filter(item => !activeSet.has(item.id)),
+    available:   catalog.filter(item => !activeSet.has(item.id) && !removedSet.has(item.id)),
+    removed:     removedIds.map(id => byId[id]).filter(Boolean),
   };
+}
+
+export function getSuggestedTabs(existingTabs = []) {
+  const existingTitles = new Set(existingTabs.map(tab => (tab.title || '').toLowerCase()));
+  return [
+    {
+      id: 'watch',
+      icon: '👁',
+      title: 'Watch',
+      reason: 'Track price action and read signals.',
+      components: ['ticker', 'chart', 'analysis'],
+    },
+    {
+      id: 'trade',
+      icon: '⚡',
+      title: 'Trade',
+      reason: 'Keep execution widgets together for order entry and position management.',
+      components: ['positions', 'order-panel', 'open-orders'],
+    },
+    {
+      id: 'review',
+      icon: '🧠',
+      title: 'Review',
+      reason: 'Use history and AI tools to review completed trades.',
+      components: ['history', 'trade-review', 'claude-insights'],
+    },
+  ].filter(tab => !existingTitles.has(tab.title.toLowerCase()));
 }
 
 export class SuggestionEngine {

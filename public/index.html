@@ -7,25 +7,23 @@
   <link rel="stylesheet" href="/core/theme.css">
 </head>
 <body>
-
-  <!-- Use mode: dashboard + controls bar -->
   <div id="app">
     <div id="app-controls">
       <span id="status" title="WebSocket"></span>
-      <button id="build-btn" title="Build Dashboard">⚙</button>
+      <button id="build-btn" title="Build Dashboard">⚙ Build</button>
     </div>
-    <main id="layout-grid"></main>
+
+    <div id="tabs-bar"></div>
+
+    <div id="workspace">
+      <main id="layout-grid"></main>
+      <aside id="builder-panel" hidden></aside>
+    </div>
   </div>
 
-  <!-- Chat: floating trigger + slide-in panel (all modes) -->
   <button id="chat-trigger" title="AI Assistant">✦</button>
   <div id="chat-backdrop"></div>
   <aside id="chat-panel"></aside>
-
-  <!-- Build mode: fullscreen overlay -->
-  <div id="builder-overlay" hidden>
-    <div id="builder-panel"></div>
-  </div>
 
   <script type="module" src="/core/app.js"></script>
 </body>

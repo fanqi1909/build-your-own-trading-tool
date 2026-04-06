@@ -6,7 +6,8 @@
 async function run() {
   const manifest = require('../plugins/okx/manifest.json');
   const { normalizeCatalog } = await import('../public/core/catalog.js');
-  const { getRecommendedComponents, groupBuilderSections } = await import('../public/core/suggestions.js');
+  const { getRecommendedComponents, groupBuilderSections, getSuggestedTabs } = await import('../public/core/suggestions.js');
+  const { migrateState } = await import('../public/core/layout.js');
 
   const catalog = normalizeCatalog(manifest);
 
@@ -35,14 +36,33 @@ async function run() {
     console.log(ok ? '[6.3] PASS — recently removed cards are suppressed from recommendations' : '[6.3] FAIL — removed card still appeared in recommendations');
   }
 
-  // 6.4 builder grouping separates active / available
+  // 6.4 builder grouping separates active / available / removed
   {
     const grouped = groupBuilderSections(catalog, ['ticker', 'chart'], ['balance']);
     const ok = grouped.active.some(x => x.id === 'ticker')
       && grouped.active.some(x => x.id === 'chart')
-      && grouped.available.some(x => x.id === 'balance')
+      && grouped.removed.some(x => x.id === 'balance')
+      && !grouped.available.some(x => x.id === 'balance')
       && !grouped.available.some(x => x.id === 'ticker');
-    console.log(ok ? '[6.4] PASS — builder sections group active and available correctly' : '[6.4] FAIL — invalid builder grouping');
+    console.log(ok ? '[6.4] PASS — builder sections group active, available, and removed correctly' : '[6.4] FAIL — invalid builder grouping');
+  }
+
+  // 6.5 old layout state migrates into one default tab
+  {
+    const migrated = migrateState({ active: [{ id: 'ticker', position: 'auto' }], removed: ['balance'] });
+    const ok = migrated.version === 2
+      && migrated.activeTabId === 'tab-1'
+      && migrated.tabs.length === 1
+      && migrated.tabs[0].layout.active[0].id === 'ticker'
+      && migrated.tabs[0].layout.removed.includes('balance');
+    console.log(ok ? '[6.5] PASS — old single-layout state migrates to tabbed state' : '[6.5] FAIL — old state migration incorrect');
+  }
+
+  // 6.6 suggested tabs skip ones that already exist
+  {
+    const suggested = getSuggestedTabs([{ title: 'Watch' }]).map(tab => tab.title);
+    const ok = !suggested.includes('Watch') && suggested.includes('Trade') && suggested.includes('Review');
+    console.log(ok ? '[6.6] PASS — suggested tabs skip existing titles' : '[6.6] FAIL — suggested tabs did not filter existing tabs correctly');
   }
 }
 
