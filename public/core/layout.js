@@ -1,9 +1,5 @@
 /**
  * public/core/layout.js — Tabbed layout manager
- *
- * Owns persisted dashboard composition state.
- * Tabs are the top-level layout unit; add/remove/restore/list APIs operate
- * on the currently active tab.
  */
 import { Component } from './component.js';
 
@@ -13,10 +9,23 @@ function makeTab(id, title = 'New Tab') {
   return {
     id,
     title,
+    context: {
+      instrument: 'BTC-USDT-SWAP',
+      bar: '15m',
+    },
     layout: {
       active: [],
       removed: [],
     },
+  };
+}
+
+function normalizeItem(item) {
+  if (typeof item === 'string') return { id: item, position: 'auto', config: {} };
+  return {
+    id: item.id,
+    position: item.position ?? 'auto',
+    config: item.config ?? {},
   };
 }
 
@@ -28,18 +37,22 @@ export class LayoutManager {
     this._storage   = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
     this._panels    = new Map();
     this._state     = {
-      version: 2,
+      version: 3,
       activeTabId: 'tab-1',
       tabs: [makeTab('tab-1', 'Watch')],
     };
+
+    this.bus.on('context:patch', ({ patch, tabId }) => {
+      this.patchContext(patch, tabId);
+    });
   }
 
-  async add(componentId, position = 'auto') {
+  async add(componentId, position = 'auto', config = {}) {
     if (this._panels.has(componentId)) return;
-    await this._mount(componentId, position);
+    await this._mount(componentId, position, config);
 
     const tab = this.getActiveTab();
-    tab.layout.active.push({ id: componentId, position });
+    tab.layout.active.push({ id: componentId, position, config });
     tab.layout.removed = tab.layout.removed.filter(id => id !== componentId);
     this.save();
 
@@ -64,8 +77,8 @@ export class LayoutManager {
     this.bus.emit('layout:changed', this.snapshot());
   }
 
-  async restore(componentId) {
-    await this.add(componentId);
+  async restore(componentId, config = {}) {
+    await this.add(componentId, 'auto', config);
   }
 
   has(componentId) {
@@ -91,6 +104,7 @@ export class LayoutManager {
       id: tab.id,
       title: tab.title,
       count: tab.layout.active.length,
+      context: { ...tab.context },
     }));
   }
 
@@ -102,15 +116,47 @@ export class LayoutManager {
     return this._state.tabs.find(tab => tab.id === this._state.activeTabId) || this._state.tabs[0];
   }
 
+  getContext(tabId = this._state.activeTabId) {
+    const tab = this._state.tabs.find(t => t.id === tabId) || this.getActiveTab();
+    return { ...tab.context };
+  }
+
+  patchContext(patch, tabId = this._state.activeTabId, sourceComponentId = null) {
+    const tab = this._state.tabs.find(t => t.id === tabId);
+    if (!tab || !patch) return;
+    const prev = { ...tab.context };
+    tab.context = { ...tab.context, ...patch };
+    const changedKeys = Object.keys(patch).filter(k => prev[k] !== tab.context[k]);
+    if (!changedKeys.length) return;
+    this.save();
+    this.bus.emit('context:changed', { tabId, context: { ...tab.context }, changedKeys, sourceComponentId });
+    this.bus.emit('layout:changed', this.snapshot());
+  }
+
+  getItemConfig(componentId, tabId = this._state.activeTabId) {
+    const tab = this._state.tabs.find(t => t.id === tabId) || this.getActiveTab();
+    return tab.layout.active.find(item => item.id === componentId)?.config || {};
+  }
+
+  updateItemConfig(componentId, patch, tabId = this._state.activeTabId) {
+    const tab = this._state.tabs.find(t => t.id === tabId) || this.getActiveTab();
+    const item = tab.layout.active.find(entry => entry.id === componentId);
+    if (!item) return;
+    item.config = { ...(item.config || {}), ...patch };
+    this.save();
+    this.bus.emit('layout:changed', this.snapshot());
+  }
+
   async addTab(title = 'New Tab', components = []) {
     const id = `tab-${Date.now()}`;
     const tab = makeTab(id, title);
-    tab.layout.active = components.map(componentId => ({ id: componentId, position: 'auto' }));
+    tab.layout.active = components.map(componentId => ({ id: componentId, position: 'auto', config: {} }));
     this._state.tabs.push(tab);
     this._state.activeTabId = id;
     await this._switchMountedTab();
     this.save();
     this.bus.emit('layout:tab-changed', this.snapshot());
+    this.bus.emit('context:changed', { tabId: id, context: { ...tab.context }, changedKeys: Object.keys(tab.context), sourceComponentId: null });
     this.bus.emit('layout:changed', this.snapshot());
   }
 
@@ -132,6 +178,12 @@ export class LayoutManager {
     if (removingActive) {
       this._state.activeTabId = this._state.tabs[Math.max(0, idx - 1)]?.id || this._state.tabs[0].id;
       await this._switchMountedTab();
+      this.bus.emit('context:changed', {
+        tabId: this._state.activeTabId,
+        context: this.getContext(),
+        changedKeys: Object.keys(this.getContext()),
+        sourceComponentId: null,
+      });
     }
     this.save();
     this.bus.emit('layout:tab-changed', this.snapshot());
@@ -145,6 +197,7 @@ export class LayoutManager {
     await this._switchMountedTab();
     this.save();
     this.bus.emit('layout:tab-changed', this.snapshot());
+    this.bus.emit('context:changed', { tabId, context: this.getContext(tabId), changedKeys: Object.keys(this.getContext(tabId)), sourceComponentId: null });
     this.bus.emit('layout:changed', this.snapshot());
   }
 
@@ -161,6 +214,7 @@ export class LayoutManager {
 
     this._state = migrateState(saved, defaults);
     await this._switchMountedTab();
+    this.bus.emit('context:changed', { tabId: this._state.activeTabId, context: this.getContext(), changedKeys: Object.keys(this.getContext()), sourceComponentId: null });
     this.bus.emit('layout:changed', this.snapshot());
   }
 
@@ -171,17 +225,20 @@ export class LayoutManager {
       activeTab: {
         id: activeTab.id,
         title: activeTab.title,
+        context: { ...activeTab.context },
         active: activeTab.layout.active.map(item => item.id),
         removed: [...activeTab.layout.removed],
       },
       tabs: this._state.tabs.map(tab => ({
         id: tab.id,
         title: tab.title,
+        context: { ...tab.context },
         active: tab.layout.active.map(item => item.id),
         removed: [...tab.layout.removed],
       })),
       active: activeTab.layout.active.map(item => item.id),
       removed: [...activeTab.layout.removed],
+      context: { ...activeTab.context },
     };
   }
 
@@ -194,11 +251,11 @@ export class LayoutManager {
 
     const tab = this.getActiveTab();
     for (const c of tab.layout.active) {
-      await this._mount(c.id, c.position ?? 'auto');
+      await this._mount(c.id, c.position ?? 'auto', c.config || {});
     }
   }
 
-  async _mount(componentId, position = 'auto') {
+  async _mount(componentId, position = 'auto', config = {}) {
     if (this._panels.has(componentId)) return;
 
     const el = document.createElement('div');
@@ -209,14 +266,14 @@ export class LayoutManager {
     const ComponentClass = await this._importComponent(componentId);
     let instance;
     try {
-      instance = new ComponentClass(el, this.bus, {});
+      instance = new ComponentClass(el, this.bus, config);
       await instance.init();
     } catch (err) {
       console.error(`[layout] ${componentId} failed to init:`, err);
       el.innerHTML = `<div class="panel__error">⚠ ${componentId} failed to load<br><small>${err.message}</small></div>`;
       instance = { destroy: () => {} };
     }
-    this._panels.set(componentId, { component: instance, el, position });
+    this._panels.set(componentId, { component: instance, el, position, config });
   }
 
   async _importComponent(componentId) {
@@ -235,19 +292,40 @@ export class LayoutManager {
 }
 
 export function migrateState(saved, defaults = []) {
-  if (saved?.version === 2 && Array.isArray(saved.tabs) && saved.tabs.length) {
+  if (saved?.version === 3 && Array.isArray(saved.tabs) && saved.tabs.length) {
+    saved.tabs.forEach(tab => {
+      tab.context = tab.context || { instrument: 'BTC-USDT-SWAP', bar: '15m' };
+      tab.layout.active = (tab.layout.active || []).map(normalizeItem);
+      tab.layout.removed = tab.layout.removed || [];
+    });
     return saved;
+  }
+
+  if (saved?.version === 2 && Array.isArray(saved.tabs) && saved.tabs.length) {
+    return {
+      version: 3,
+      activeTabId: saved.activeTabId,
+      tabs: saved.tabs.map(tab => ({
+        ...tab,
+        context: tab.context || { instrument: 'BTC-USDT-SWAP', bar: '15m' },
+        layout: {
+          active: (tab.layout.active || []).map(normalizeItem),
+          removed: tab.layout.removed || [],
+        },
+      })),
+    };
   }
 
   if (saved && Array.isArray(saved.active)) {
     return {
-      version: 2,
+      version: 3,
       activeTabId: 'tab-1',
       tabs: [{
         id: 'tab-1',
         title: 'Watch',
+        context: { instrument: 'BTC-USDT-SWAP', bar: '15m' },
         layout: {
-          active: saved.active,
+          active: saved.active.map(normalizeItem),
           removed: Array.isArray(saved.removed) ? saved.removed : [],
         },
       }],
@@ -255,13 +333,14 @@ export function migrateState(saved, defaults = []) {
   }
 
   return {
-    version: 2,
+    version: 3,
     activeTabId: 'tab-1',
     tabs: [{
       id: 'tab-1',
       title: 'Watch',
+      context: { instrument: 'BTC-USDT-SWAP', bar: '15m' },
       layout: {
-        active: defaults.map(c => typeof c === 'string' ? { id: c, position: 'auto' } : c),
+        active: defaults.map(normalizeItem),
         removed: [],
       },
     }],

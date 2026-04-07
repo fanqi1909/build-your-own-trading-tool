@@ -50,10 +50,12 @@ async function run() {
   // 6.5 old layout state migrates into one default tab
   {
     const migrated = migrateState({ active: [{ id: 'ticker', position: 'auto' }], removed: ['balance'] });
-    const ok = migrated.version === 2
+    const ok = migrated.version === 3
       && migrated.activeTabId === 'tab-1'
       && migrated.tabs.length === 1
+      && migrated.tabs[0].context.instrument === 'BTC-USDT-SWAP'
       && migrated.tabs[0].layout.active[0].id === 'ticker'
+      && migrated.tabs[0].layout.active[0].config
       && migrated.tabs[0].layout.removed.includes('balance');
     console.log(ok ? '[6.5] PASS — old single-layout state migrates to tabbed state' : '[6.5] FAIL — old state migration incorrect');
   }

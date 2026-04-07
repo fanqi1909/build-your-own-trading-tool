@@ -24,16 +24,14 @@ function register(ctx) {
   const { adapter, bus, cache, stores, refresh, getMode } = ctx;
   const ANALYZE_PY = process.env.ANALYZE_PY || path.join(__dirname, '../../../analyze.py');
 
-  // ── Fast refresh: ticker every 5s ──────────────────────────────────────────
-
-  async function fastRefresh() {
+  async function fastRefresh(inst = 'BTC-USDT') {
     try {
-      cache.ticker = await adapter.fetchTicker('BTC-USDT', getMode());
-    } catch (e) { console.error('[fast]', e.message); }
+      cache.ticker = await adapter.fetchTicker(inst, getMode());
+    } catch (e) {
+      console.error('[fast]', e.message);
+    }
     bus.emit('broadcast', { type: 'ticker', data: cache.ticker, mode: getMode() });
   }
-
-  // ── Technical analysis runner ───────────────────────────────────────────────
 
   function _runAnalysisForBar(inst, bar) {
     const flag = getMode() === 'demo' ? '--demo' : '--profile live';
@@ -60,48 +58,48 @@ function register(ctx) {
     return `【主图 ${bar}】\n${primary}\n【趋势参考 ${higherBar}】\n${higher}${lowerSection}`;
   }
 
-  // ── Candle refresh: fetch + store + broadcast ───────────────────────────────
-
   async function candleRefresh(inst = 'BTC-USDT', bar = '15m') {
     try {
       const conn    = stores.candles.getCandleConn();
       const fetches = [adapter.fetchCandles(inst, bar, 100, getMode())];
       if (bar !== '3m') fetches.push(adapter.fetchCandles(inst, '3m', 100, getMode()));
       const [fresh, fresh3m] = await Promise.all(fetches);
-      if (conn && fresh.length)   await stores.candles.upsertCandles(inst, bar,  fresh);
+      if (conn && fresh.length) await stores.candles.upsertCandles(inst, bar, fresh);
       if (conn && fresh3m?.length) await stores.candles.upsertCandles(inst, '3m', fresh3m);
       const full = conn ? await stores.candles.loadCandlesFromDB(inst, bar, 500) : fresh;
       cache.candles = full.length ? full : fresh;
       cache.lastCandleUpdate = Date.now();
-    } catch (e) { console.error('[candles]', e.message); }
+    } catch (e) {
+      console.error('[candles]', e.message);
+    }
     bus.emit('broadcast', { type: 'candles', data: cache.candles, inst, bar });
     if (refresh.analysis) {
       await refresh.analysis(inst, bar);
     }
   }
 
-  // Expose on ctx.refresh so other modules can call these
   refresh.fast        = fastRefresh;
   refresh.candles     = candleRefresh;
   refresh.runAnalysis = runAnalysis;
-
-  // ── Connect handler: send cached state on new WS connection ────────────────
 
   ctx.ws.registerConnect((ws) => {
     if (cache.ticker)  ws.send(JSON.stringify({ type: 'ticker',  data: cache.ticker,  mode: getMode() }));
     if (cache.candles) ws.send(JSON.stringify({ type: 'candles', data: cache.candles }));
   });
 
-  // ── Action handlers ─────────────────────────────────────────────────────────
-
   const actions = {
     async candles(msg) {
-      await candleRefresh(msg.inst || 'BTC-USDT', msg.bar || '15m');
+      await candleRefresh(msg.inst || 'BTC-USDT-SWAP', msg.bar || '15m');
+    },
+
+    async fetchTicker(msg) {
+      await fastRefresh(msg.inst || 'BTC-USDT');
     },
 
     async fetchAtr(msg) {
       try {
-        const candles = await adapter.fetchCandles('BTC-USDT-SWAP', '3m', 20, getMode());
+        const inst = msg?.inst || 'BTC-USDT-SWAP';
+        const candles = await adapter.fetchCandles(inst, '3m', 20, getMode());
         return { type: 'atrData', candles };
       } catch (e) {
         return { type: 'atrData', error: e.message };
@@ -109,16 +107,13 @@ function register(ctx) {
     },
   };
 
-  // ── Timers ──────────────────────────────────────────────────────────────────
-
   const timers = [
-    { name: 'fast',    fn: fastRefresh,   intervalMs: 5000 },
+    { name: 'fast', fn: fastRefresh, intervalMs: 5000 },
     { name: 'candles', fn: () => candleRefresh(), intervalMs: 10 * 60 * 1000 },
   ];
 
   async function onReady() {
     await fastRefresh();
-    // Candle refresh triggers analysis; analysis module must register first
     await candleRefresh();
   }
 

@@ -10,6 +10,10 @@ The OKX trading domain is the **reference implementation** — the architecture 
 
 ---
 
+## Related design notes
+
+- See `docs/COMPONENT_IO_WORKSPACE_CONTEXT.md` for the next-step design that formalizes component inputs/outputs and tab-level shared workspace context.
+
 ## Design Principles
 
 1. **Assistant is the main character** — Chat panel is always visible; dashboard panels are supporting context that the AI manages
