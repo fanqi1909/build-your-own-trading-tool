@@ -138,14 +138,10 @@ body[data-ui-mode="build"] #workspace {
   box-shadow: inset 0 0 0 1px rgba(77,158,255,0.12);
 }
 
-.panel--chart,
-.panel--analysis,
-.panel--position-track,
-.panel--history,
-.panel--trade-review,
-.panel--claude-insights {
-  grid-column: 1 / -1;
-}
+/* Panel size — controlled via data-size attribute set by app.js */
+.panel[data-size="tile"] { grid-column: auto; }
+.panel[data-size="half"] { grid-column: span 2; }
+.panel[data-size="full"] { grid-column: 1 / -1; }
 
 .panel {
   background: var(--bg-card);
@@ -189,6 +185,26 @@ body[data-ui-mode="build"] .panel:hover .panel__remove-btn { opacity: 1; }
 body[data-ui-mode="build"] .panel:hover .panel__drag-handle { opacity: 1; }
 .panel__drag-handle:hover { color: var(--text); }
 .panel__drag-handle:active { cursor: grabbing; }
+
+.panel__size-btn {
+  position: absolute;
+  top: 8px; right: 72px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(0,0,0,0.25);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transition: opacity var(--transition), color var(--transition);
+}
+body[data-ui-mode="build"] .panel:hover .panel__size-btn { opacity: 1; }
+.panel__size-btn:hover { color: var(--blue); border-color: var(--blue); }
 
 .panel--dragging {
   opacity: 0.4;
@@ -531,12 +547,8 @@ body[data-ui-mode="build"] #builder-panel {
 @media (max-width: 767px) {
   #layout-grid { grid-template-columns: 1fr; }
 
-  .panel--chart,
-  .panel--analysis,
-  .panel--position-track,
-  .panel--history,
-  .panel--trade-review,
-  .panel--claude-insights { grid-column: 1; }
+  .panel[data-size="half"],
+  .panel[data-size="full"] { grid-column: 1; }
 
   .builder__presets { grid-template-columns: 1fr 1fr; }
 }

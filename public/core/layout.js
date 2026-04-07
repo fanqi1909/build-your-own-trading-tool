@@ -21,11 +21,12 @@ function makeTab(id, title = 'New Tab') {
 }
 
 function normalizeItem(item) {
-  if (typeof item === 'string') return { id: item, position: 'auto', config: {} };
+  if (typeof item === 'string') return { id: item, position: 'auto', size: null, config: {} };
   return {
-    id: item.id,
+    id:       item.id,
     position: item.position ?? 'auto',
-    config: item.config ?? {},
+    size:     item.size     ?? null,
+    config:   item.config   ?? {},
   };
 }
 
@@ -79,6 +80,15 @@ export class LayoutManager {
 
   async restore(componentId, config = {}) {
     await this.add(componentId, 'auto', config);
+  }
+
+  setItemSize(componentId, size) {
+    const tab = this.getActiveTab();
+    const item = tab.layout.active.find(i => i.id === componentId);
+    if (!item) return;
+    item.size = size;  // null | 'tile' | 'half' | 'full'
+    this.save();
+    this.bus.emit('layout:changed', this.snapshot());
   }
 
   reorder(fromId, toId) {

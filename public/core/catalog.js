@@ -58,7 +58,7 @@ export function normalizeCatalog(manifest) {
       configSchema:         cap.configSchema || {},
       starterPriority:      STARTER_PRIORITY[cap.component] || 0,
       recommendedByDefault: DEFAULT_RECOMMENDED.has(cap.component),
-      cardSize:             isWide(cap.component) ? 'wide' : 'tile',
+      defaultSize:          isWide(cap.component) ? 'full' : 'tile',
     }))
     .sort((a, b) => b.starterPriority - a.starterPriority || a.title.localeCompare(b.title));
 }

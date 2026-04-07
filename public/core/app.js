@@ -42,6 +42,7 @@ class App {
     this.bus.on('ws:close', () => this._setStatus(false));
 
     await this.layout.restoreFromStorage([]);
+    this._applyPanelSizes();
 
     this.suggestions = new SuggestionEngine(this.bus, this.layout, this.catalog);
     this.suggestions.init();
@@ -49,11 +50,13 @@ class App {
     this.bus.on('layout:changed', () => {
       this.builder.render();
       this._renderTabsBar();
+      this._applyPanelSizes();
       this._renderLayoutDecorations();
     });
     this.bus.on('layout:tab-changed', () => {
       this.builder.render();
       this._renderTabsBar();
+      this._applyPanelSizes();
       this._renderLayoutDecorations();
     });
 
@@ -149,11 +152,24 @@ class App {
     });
   }
 
+  _applyPanelSizes() {
+    const grid = document.getElementById('layout-grid');
+    if (!grid) return;
+    const activeLayout = this.layout.getActiveTab().layout.active;
+    for (const item of activeLayout) {
+      const panel = grid.querySelector(`.panel--${item.id}`);
+      if (!panel) continue;
+      const catalogItem = this.catalog.find(c => c.id === item.id);
+      const size = item.size || catalogItem?.defaultSize || 'tile';
+      panel.dataset.size = size;
+    }
+  }
+
   _renderLayoutDecorations() {
     const grid = document.getElementById('layout-grid');
     if (!grid) return;
 
-    grid.querySelectorAll('.panel__remove-btn, .panel__drag-handle, .panel--add-widget').forEach(el => el.remove());
+    grid.querySelectorAll('.panel__remove-btn, .panel__drag-handle, .panel__size-btn, .panel--add-widget').forEach(el => el.remove());
     grid.classList.toggle('layout-grid--build', this.uiMode === 'build');
 
     // Reset drag state on all panels
@@ -175,6 +191,23 @@ class App {
       btn.title = `Remove ${id}`;
       btn.addEventListener('click', () => this.layout.remove(id));
       panel.appendChild(btn);
+
+      // Size toggle button
+      const SIZE_CYCLE = ['tile', 'half', 'full'];
+      const SIZE_LABEL = { tile: '⊡ Tile', half: '◫ Half', full: '⊞ Full' };
+      const catalogItem = this.catalog.find(c => c.id === id);
+      const activeItem = this.layout.getActiveTab().layout.active.find(i => i.id === id);
+      const currentSize = activeItem?.size || catalogItem?.defaultSize || 'tile';
+      const sizeBtn = document.createElement('button');
+      sizeBtn.className = 'panel__size-btn';
+      sizeBtn.textContent = SIZE_LABEL[currentSize] || '⊡ Tile';
+      sizeBtn.title = 'Cycle panel size';
+      sizeBtn.addEventListener('click', () => {
+        const idx = SIZE_CYCLE.indexOf(currentSize);
+        const next = SIZE_CYCLE[(idx + 1) % SIZE_CYCLE.length];
+        this.layout.setItemSize(id, next);
+      });
+      panel.appendChild(sizeBtn);
 
       // Drag handle
       const handle = document.createElement('div');
