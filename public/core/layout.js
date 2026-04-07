@@ -81,6 +81,31 @@ export class LayoutManager {
     await this.add(componentId, 'auto', config);
   }
 
+  reorder(fromId, toId) {
+    if (fromId === toId) return;
+    const tab = this.getActiveTab();
+    const items = tab.layout.active;
+    const fromIdx = items.findIndex(i => i.id === fromId);
+    const toIdx   = items.findIndex(i => i.id === toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+
+    // Move DOM element to match new order
+    const fromEl = this.container.querySelector(`.panel--${fromId}`);
+    const toEl   = this.container.querySelector(`.panel--${toId}`);
+    if (fromEl && toEl) {
+      if (toIdx < fromIdx) {
+        this.container.insertBefore(fromEl, toEl);
+      } else {
+        this.container.insertBefore(fromEl, toEl.nextSibling);
+      }
+    }
+    this.save();
+    this.bus.emit('layout:changed', this.snapshot());
+  }
+
   has(componentId) {
     return this._panels.has(componentId);
   }

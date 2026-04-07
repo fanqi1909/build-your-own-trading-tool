@@ -126,12 +126,45 @@ export class BuilderPanel {
 
   _card(item, action) {
     const label = action === 'restore' ? 'Restore' : 'Add';
+    const ioTags = [
+      ...(item.inputs  || []).map(k => `<span class="builder__io-tag builder__io-tag--in"  title="reads ${k}">↓${k}</span>`),
+      ...(item.outputs || []).map(k => `<span class="builder__io-tag builder__io-tag--out" title="writes ${k}">↑${k}</span>`),
+    ].join('');
+
+    const schemaKeys = Object.keys(item.configSchema || {});
+    const configRows = schemaKeys.map(key => {
+      const s = item.configSchema[key];
+      if (s.type === 'select') {
+        return `<div class="builder__cfg-row">
+          <label class="builder__cfg-label">${s.label}</label>
+          <select class="builder__cfg-input" data-cfg-key="${key}" data-component="${item.id}">
+            ${(s.options || []).map(o => `<option value="${o}">${o}</option>`).join('')}
+          </select>
+        </div>`;
+      }
+      if (s.type === 'boolean') {
+        return `<div class="builder__cfg-row">
+          <label class="builder__cfg-label">${s.label}</label>
+          <input class="builder__cfg-check" type="checkbox" data-cfg-key="${key}" data-component="${item.id}" checked>
+        </div>`;
+      }
+      if (s.type === 'number') {
+        return `<div class="builder__cfg-row">
+          <label class="builder__cfg-label">${s.label}</label>
+          <input class="builder__cfg-input builder__cfg-input--sm" type="number" data-cfg-key="${key}" data-component="${item.id}" value="${s.default ?? ''}" min="${s.min ?? ''}" max="${s.max ?? ''}">
+        </div>`;
+      }
+      return '';
+    }).join('');
+
     return `
       <div class="builder__component" data-component="${item.id}">
         <div class="builder__component-icon">${item.icon}</div>
         <div class="builder__component-info">
           <div class="builder__component-label">${item.title}</div>
           <div class="builder__component-desc">${item.description}</div>
+          ${ioTags ? `<div class="builder__io-tags">${ioTags}</div>` : ''}
+          ${configRows ? `<details class="builder__cfg"><summary class="builder__cfg-toggle">Configure</summary>${configRows}</details>` : ''}
         </div>
         <button class="builder__component-action builder__component-action--${action}" data-component="${item.id}" data-action="${action}">${label}</button>
       </div>

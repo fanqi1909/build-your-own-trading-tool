@@ -12,6 +12,7 @@ export class Component {
     this.bus    = bus;
     this.config = { ...(this.constructor.defaultConfig || {}), ...(config || {}) };
     this._subscriptions = [];
+    this._statusOverlay = null;
   }
 
   on(event, handler) {
@@ -47,6 +48,32 @@ export class Component {
       if (tabId && activeTabId && tabId !== activeTabId) return;
       handler({ context, tabId, changedKeys, sourceComponentId });
     });
+  }
+
+  /**
+   * setStatus(state, message?)
+   * state: 'loading' | 'ready' | 'error' | 'empty'
+   * Shows an overlay on the panel; 'ready' removes it.
+   */
+  setStatus(state, msg = '') {
+    if (state === 'ready') {
+      if (this._statusOverlay) {
+        this._statusOverlay.remove();
+        this._statusOverlay = null;
+      }
+      return;
+    }
+    if (!this._statusOverlay) {
+      this._statusOverlay = document.createElement('div');
+      this._statusOverlay.className = 'component-status';
+    }
+    this._statusOverlay.dataset.state = state;
+    this._statusOverlay.innerHTML = {
+      loading: `<span class="component-status__spinner"></span><span class="component-status__msg">${msg || 'Loading…'}</span>`,
+      error:   `<span class="component-status__icon">⚠</span><span class="component-status__msg">${msg || 'Error'}</span>`,
+      empty:   `<span class="component-status__icon">—</span><span class="component-status__msg">${msg || 'No data'}</span>`,
+    }[state] || '';
+    this.el.appendChild(this._statusOverlay);
   }
 
   getConfig() {

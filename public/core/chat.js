@@ -4,8 +4,10 @@
  * Renders into #chat-panel, handles streaming AI responses,
  * and executes layout actions returned by the assistant.
  */
+import { parseAndExecute } from './ai-actions.js';
 
 const ACTION_TAG_RE = /<(enable-component|disable-component)\s+id="[^"]*"\s*\/?>|<set-mode\s+mode="[^"]*"\s*\/?>/g;
+const NEW_ACTION_TAG_RE = /\[ACTION:\w+(?:\s+[^\]]+)?\]/g;
 
 export class ChatPanel {
   constructor(containerEl, bus) {
@@ -104,7 +106,14 @@ export class ChatPanel {
     if (this._streamEl) {
       this._streamEl.classList.remove('chat__msg--streaming');
       const textEl = this._streamEl.querySelector('.chat__msg-text');
-      if (textEl) textEl.textContent = this._stripTags(this._streamBuffer);
+      if (textEl) {
+        // Execute [ACTION:...] tags and get clean text
+        const layout = window.app?.layout;
+        const clean = layout
+          ? parseAndExecute(this._streamBuffer, layout, this.bus)
+          : this._streamBuffer.replace(NEW_ACTION_TAG_RE, '');
+        textEl.textContent = this._stripTags(clean);
+      }
     }
     this._streamEl = null;
     this._streamBuffer = '';
@@ -172,7 +181,7 @@ export class ChatPanel {
   }
 
   _stripTags(text) {
-    return text.replace(ACTION_TAG_RE, '').replace(/\n{3,}/g, '\n\n').trim();
+    return text.replace(ACTION_TAG_RE, '').replace(NEW_ACTION_TAG_RE, '').replace(/\n{3,}/g, '\n\n').trim();
   }
 
   _addMessage(role, text, streaming = false) {

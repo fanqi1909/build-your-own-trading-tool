@@ -21,6 +21,7 @@ class App {
     this.suggestions = null;
     this.catalog     = [];
     this.uiMode      = 'use';
+    this._dragFromId = null;
   }
 
   async init() {
@@ -152,20 +153,67 @@ class App {
     const grid = document.getElementById('layout-grid');
     if (!grid) return;
 
-    grid.querySelectorAll('.panel__remove-btn, .panel--add-widget').forEach(el => el.remove());
+    grid.querySelectorAll('.panel__remove-btn, .panel__drag-handle, .panel--add-widget').forEach(el => el.remove());
     grid.classList.toggle('layout-grid--build', this.uiMode === 'build');
+
+    // Reset drag state on all panels
+    grid.querySelectorAll('.panel').forEach(p => {
+      p.removeAttribute('draggable');
+      p.classList.remove('panel--dragging', 'panel--drop-target');
+    });
 
     if (this.uiMode !== 'build') return;
 
     for (const id of this.layout.list()) {
       const panel = grid.querySelector(`.panel--${id}`);
       if (!panel) continue;
+
+      // Remove button
       const btn = document.createElement('button');
       btn.className = 'panel__remove-btn';
       btn.textContent = '−';
       btn.title = `Remove ${id}`;
       btn.addEventListener('click', () => this.layout.remove(id));
       panel.appendChild(btn);
+
+      // Drag handle
+      const handle = document.createElement('div');
+      handle.className = 'panel__drag-handle';
+      handle.title = 'Drag to reorder';
+      handle.textContent = '⠿';
+      panel.appendChild(handle);
+
+      // Make panel draggable via handle
+      handle.addEventListener('mousedown', () => { panel.draggable = true; });
+      panel.addEventListener('dragend', () => { panel.draggable = false; });
+
+      panel.addEventListener('dragstart', (e) => {
+        this._dragFromId = id;
+        panel.classList.add('panel--dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      panel.addEventListener('dragend', () => {
+        this._dragFromId = null;
+        panel.classList.remove('panel--dragging');
+        grid.querySelectorAll('.panel--drop-target').forEach(p => p.classList.remove('panel--drop-target'));
+      });
+
+      panel.addEventListener('dragover', (e) => {
+        if (!this._dragFromId || this._dragFromId === id) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        grid.querySelectorAll('.panel--drop-target').forEach(p => p.classList.remove('panel--drop-target'));
+        panel.classList.add('panel--drop-target');
+      });
+
+      panel.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!this._dragFromId || this._dragFromId === id) return;
+        this.layout.reorder(this._dragFromId, id);
+        this._dragFromId = null;
+        grid.querySelectorAll('.panel--drop-target').forEach(p => p.classList.remove('panel--drop-target'));
+      });
     }
 
     const add = document.createElement('button');

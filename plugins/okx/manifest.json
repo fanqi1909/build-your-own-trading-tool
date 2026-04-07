@@ -17,82 +17,150 @@
   "capabilities": {
     "market.ticker": {
       "label": "Real-time Price",
-      "description": "BTC/USDT price, 24h change, volume",
+      "description": "Live price, 24h change, high/low, volume. Updates every 5 s.",
       "stage": "observe",
       "component": "ticker",
-      "refresh": { "event": "fast", "interval": 5000 }
+      "inputs": ["instrument"],
+      "outputs": ["instrument"],
+      "refresh": { "event": "fast", "interval": 5000 },
+      "configSchema": {
+        "symbols": {
+          "type": "array",
+          "label": "Watchlist",
+          "description": "Instruments shown in the dropdown",
+          "default": ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"]
+        },
+        "preset": {
+          "type": "select",
+          "label": "Preset",
+          "description": "Quick symbol group",
+          "options": ["majors", "defi", "custom"],
+          "default": "majors"
+        }
+      }
     },
     "market.candles": {
       "label": "Candlestick Chart",
-      "description": "Multi-timeframe K-line chart with crosshair",
+      "description": "Multi-timeframe K-line chart with crosshair and volume. Powered by lightweight-charts.",
       "stage": "observe",
       "component": "chart",
-      "refresh": { "event": "candles", "interval": 600000 }
+      "inputs": ["instrument", "bar"],
+      "outputs": ["bar"],
+      "refresh": { "event": "candles", "interval": 600000 },
+      "configSchema": {}
     },
     "account.balance": {
       "label": "Account Balance",
-      "description": "Total equity, available balance, currency breakdown",
+      "description": "Total equity, available margin, currency breakdown. Updates every 60 s.",
       "stage": "observe",
       "component": "balance",
-      "refresh": { "event": "slow", "interval": 60000 }
+      "inputs": [],
+      "outputs": [],
+      "refresh": { "event": "slow", "interval": 60000 },
+      "configSchema": {}
     },
     "trading.positions": {
       "label": "Position Management",
-      "description": "View and close/reduce current positions",
+      "description": "Open perpetual positions with unrealized P&L, liquidation price, and one-click close/reduce.",
       "stage": "trade",
       "component": "positions",
+      "inputs": ["instrument"],
+      "outputs": [],
       "requires": ["market.ticker"],
-      "refresh": { "event": "slow", "interval": 60000 }
+      "refresh": { "event": "slow", "interval": 60000 },
+      "configSchema": {}
     },
     "trading.orders": {
       "label": "Place Orders",
-      "description": "Market/limit orders with SL/TP and leverage",
+      "description": "Market/limit/post-only orders with leverage, SL/TP, and AI-assisted sizing.",
       "stage": "trade",
       "component": "order-panel",
-      "requires": ["market.ticker"]
+      "inputs": ["instrument"],
+      "outputs": [],
+      "requires": ["market.ticker"],
+      "configSchema": {
+        "defaultLever": {
+          "type": "number",
+          "label": "Default Leverage",
+          "description": "Pre-filled leverage when the panel opens",
+          "default": 10,
+          "min": 1,
+          "max": 125
+        },
+        "defaultOrdType": {
+          "type": "select",
+          "label": "Default Order Type",
+          "options": ["limit", "market", "post_only"],
+          "default": "limit"
+        }
+      }
     },
     "trading.open-orders": {
       "label": "Open Orders",
-      "description": "Pending orders with cancel/amend",
+      "description": "Pending orders with live status, cancel, and amend. Updates every 10 s.",
       "stage": "trade",
       "component": "open-orders",
-      "refresh": { "event": "orders", "interval": 10000 }
+      "inputs": ["instrument"],
+      "outputs": [],
+      "refresh": { "event": "orders", "interval": 10000 },
+      "configSchema": {}
     },
     "analysis.technical": {
       "label": "Technical Analysis",
-      "description": "Multi-timeframe indicators: RSI, MACD, BB, StochRSI, ADX, S/R",
+      "description": "Multi-timeframe indicators: RSI, MACD, Bollinger Bands, StochRSI, ADX, Support/Resistance.",
       "stage": "understand",
       "component": "analysis",
-      "requires": ["market.candles"]
+      "inputs": ["instrument", "bar"],
+      "outputs": [],
+      "requires": ["market.candles"],
+      "configSchema": {
+        "autoRun": {
+          "type": "boolean",
+          "label": "Auto-run on candle refresh",
+          "default": true
+        }
+      }
     },
     "analysis.ai-assess": {
       "label": "AI Market Assessment",
-      "description": "Claude analyzes signals and gives trading advice",
+      "description": "Claude reads the technical signals and gives a structured trade assessment with confidence score.",
       "stage": "optimize",
       "component": "claude-insights",
-      "requires": ["analysis.technical"]
+      "inputs": ["instrument", "bar"],
+      "outputs": [],
+      "requires": ["analysis.technical"],
+      "configSchema": {}
     },
     "analysis.position-track": {
       "label": "Position Tracking",
-      "description": "AI monitors positions and suggests SL/TP adjustments",
+      "description": "AI monitors open positions and proactively suggests SL/TP adjustments as market moves.",
       "stage": "optimize",
       "component": "position-track",
+      "inputs": ["instrument"],
+      "outputs": [],
       "requires": ["trading.positions", "analysis.technical"],
-      "refresh": { "event": "postrack", "interval": 180000 }
+      "refresh": { "event": "postrack", "interval": 180000 },
+      "configSchema": {}
     },
     "review.history": {
       "label": "Order History",
-      "description": "Past trades with P&L",
+      "description": "Closed trades with entry/exit price, P&L, fees, and duration.",
       "stage": "optimize",
       "component": "history",
-      "refresh": { "event": "slow", "interval": 60000 }
+      "inputs": [],
+      "outputs": [],
+      "refresh": { "event": "slow", "interval": 60000 },
+      "configSchema": {}
     },
     "review.postmortem": {
       "label": "Trade Postmortem",
-      "description": "AI reviews past trades with chart context",
+      "description": "AI reviews past trades with chart replay context and suggests what to improve.",
       "stage": "optimize",
       "component": "trade-review",
-      "requires": ["review.history", "market.candles"]
+      "inputs": ["instrument"],
+      "outputs": [],
+      "requires": ["review.history", "market.candles"],
+      "configSchema": {}
     }
   },
 

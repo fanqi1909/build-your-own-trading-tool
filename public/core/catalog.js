@@ -46,16 +46,19 @@ export function normalizeCatalog(manifest) {
 
   return caps
     .map((cap) => ({
-      id:                 cap.component,
-      title:              cap.label,
-      description:        cap.description,
-      stage:              cap.stage,
-      category:           CATEGORIES[cap.stage] || 'Other',
-      icon:               ICONS[cap.component] || '◻',
-      requires:           [...(cap.requires || [])],
-      starterPriority:    STARTER_PRIORITY[cap.component] || 0,
+      id:                   cap.component,
+      title:                cap.label,
+      description:          cap.description,
+      stage:                cap.stage,
+      category:             CATEGORIES[cap.stage] || 'Other',
+      icon:                 ICONS[cap.component] || '◻',
+      requires:             [...(cap.requires || [])],
+      inputs:               [...(cap.inputs  || [])],
+      outputs:              [...(cap.outputs || [])],
+      configSchema:         cap.configSchema || {},
+      starterPriority:      STARTER_PRIORITY[cap.component] || 0,
       recommendedByDefault: DEFAULT_RECOMMENDED.has(cap.component),
-      cardSize:           isWide(cap.component) ? 'wide' : 'tile',
+      cardSize:             isWide(cap.component) ? 'wide' : 'tile',
     }))
     .sort((a, b) => b.starterPriority - a.starterPriority || a.title.localeCompare(b.title));
 }
