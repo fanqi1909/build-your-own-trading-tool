@@ -202,7 +202,7 @@ async function amendAlgoOrder({ inst, algoId, sl, tp }, mode) {
 }
 
 async function fetchInstruments(mode) {
-  const data = await _run('public instruments --inst-type SWAP', mode);
+  const data = await _run('market instruments --instType SWAP', mode);
   return Array.isArray(data) ? data : [];
 }
 

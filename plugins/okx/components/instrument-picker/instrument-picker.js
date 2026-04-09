@@ -1,17 +1,22 @@
 import { Component } from '/core/component.js';
 
 const GROUPS = {
-  'Major':   ['BTC', 'ETH'],
-  'Layer 1': ['SOL', 'AVAX', 'ADA', 'DOT', 'ATOM', 'NEAR', 'ARB', 'OP', 'SUI', 'APT', 'INJ', 'SEI'],
-  'DeFi':    ['UNI', 'AAVE', 'CRV', 'MKR', 'LDO', 'COMP', 'SNX', 'GMX', 'DYDX'],
-  'Meme':    ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'DOGS'],
+  'Major':   ['BTC', 'ETH', 'BNB', 'XRP', 'USDC'],
+  'Layer 1': ['SOL', 'AVAX', 'ADA', 'DOT', 'ATOM', 'NEAR', 'ARB', 'OP', 'SUI', 'APT', 'INJ', 'SEI', 'TRX', 'TON', 'FTM', 'ALGO', 'HBAR', 'ICP', 'ETC', 'BCH', 'LTC', 'XLM', 'VET'],
+  'Layer 2': ['MATIC', 'POL', 'IMX', 'STRK', 'MANTA', 'ZKSYNC', 'BLAST', 'SCROLL', 'BASE'],
+  'DeFi':    ['UNI', 'AAVE', 'CRV', 'MKR', 'LDO', 'COMP', 'SNX', 'GMX', 'DYDX', 'JUP', 'PENDLE', 'ENA', 'ETHFI', 'ONDO', 'W', 'ZRO', 'MORPHO'],
+  'AI & DePIN': ['FET', 'RENDER', 'WLD', 'TAO', 'ARKM', 'GRT', 'API3', 'PAAL', 'IOTX', 'HNT', 'MOBILE'],
+  'Gaming':  ['AXS', 'SAND', 'MANA', 'ENJ', 'GALA', 'IMX', 'BEAM', 'RON'],
+  'Meme':    ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'DOGS', 'MEW', 'POPCAT', 'NEIRO', 'GOAT', 'PNUT'],
 };
+
+const OTHERS_LIMIT = 8; // show only this many in Others when not searching
 
 function getGroup(baseCcy) {
   for (const [group, bases] of Object.entries(GROUPS)) {
     if (bases.includes(baseCcy)) return group;
   }
-  return 'Others';
+  return null; // not in any named group
 }
 
 export default class InstrumentPickerComponent extends Component {
@@ -93,38 +98,57 @@ export default class InstrumentPickerComponent extends Component {
     const list = this.el.querySelector('#ip-list');
     if (!list) return;
 
-    const query = this._query;
+    const query  = this._query;
     const favSet = new Set(this.getConfig().favorites);
     const wlSet  = new Set(this._watchlist);
 
-    // Filter
     const filtered = query
       ? this._instruments.filter(i => i.instId.includes(query) || i.baseCcy?.includes(query))
       : this._instruments;
 
-    if (!filtered.length) {
-      list.innerHTML = `<div class="ip__empty">No results for "${this._query}"</div>`;
+    if (!filtered.length && query) {
+      list.innerHTML = `<div class="ip__empty">No results for "${query}" — try a different symbol</div>`;
       return;
     }
 
-    // Group
     const groups = {};
+
+    // Favorites section (only when not searching)
     if (!query) {
-      // Favorites section first
       const favs = filtered.filter(i => favSet.has(i.instId));
       if (favs.length) groups['★ Favorites'] = favs;
     }
 
+    // Named groups
     for (const inst of filtered) {
       const g = getGroup(inst.baseCcy);
+      if (!g) continue; // skip — goes to others
       if (!groups[g]) groups[g] = [];
       groups[g].push(inst);
     }
 
-    const html = Object.entries(groups).map(([group, items]) => `
+    // Others — only ungrouped instruments
+    const others = filtered.filter(i => getGroup(i.baseCcy) === null && !favSet.has(i.instId));
+
+    const renderGroup = ([group, items]) => `
       <div class="ip__group-label">${group}</div>
       ${items.map(inst => this._rowHtml(inst, wlSet)).join('')}
-    `).join('');
+    `;
+
+    let html = Object.entries(groups).map(renderGroup).join('');
+
+    // Others: show limited count when not searching, full list when searching
+    if (others.length) {
+      const shown   = query ? others : others.slice(0, OTHERS_LIMIT);
+      const hasMore = !query && others.length > OTHERS_LIMIT;
+      html += `<div class="ip__group-label">Others</div>`;
+      html += shown.map(inst => this._rowHtml(inst, wlSet)).join('');
+      if (hasMore) {
+        html += `<div class="ip__more">Search to find ${others.length - OTHERS_LIMIT} more pairs…</div>`;
+      }
+    }
+
+    if (!html) html = '<div class="ip__empty">No instruments loaded yet</div>';
 
     list.innerHTML = html;
     this._bindRowEvents();
@@ -236,6 +260,7 @@ export default class InstrumentPickerComponent extends Component {
       .ip__star { background: none; border: none; color: var(--text-dim, #334155); cursor: pointer; font-size: 12px; padding: 0 2px; line-height: 1; flex-shrink: 0; transition: color 0.15s; }
       .ip__star:hover, .ip__star--on { color: #f59e0b; }
       .ip__loading, .ip__empty { font-size: 12px; color: var(--text-dim, #334155); padding: 12px 0; }
+      .ip__more { font-size: 10px; color: var(--text-dim, #334155); padding: 6px 4px; font-style: italic; }
     `;
     document.head.appendChild(s);
   }
