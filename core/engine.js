@@ -72,6 +72,7 @@ class Engine {
       const auth = createAuth(process.env.APP_PASSWORD);
       this._app.post('/api/auth/login',  auth.loginHandler);
       this._app.get('/api/auth/logout',  auth.logoutHandler);
+      this._app.get('/login', (req, res) => res.sendFile(path.join(this.staticDir, 'login.html')));
       this._app.use(auth.middleware);
       verifyWs = auth.verifyWs;
       console.log('[engine] auth enabled');
