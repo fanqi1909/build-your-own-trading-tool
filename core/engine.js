@@ -123,8 +123,8 @@ class Engine {
 
     await new Promise((resolve, reject) => {
       this._server.once('error', reject);
-      this._server.listen(this.port, () => {
-        console.log(`[engine] listening on http://localhost:${this.port}`);
+      this._server.listen(this.port, '0.0.0.0', () => {
+        console.log(`[engine] listening on http://0.0.0.0:${this.port}`);
         resolve();
       });
     });
