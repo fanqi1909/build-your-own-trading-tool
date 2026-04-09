@@ -1,42 +1,61 @@
 'use strict';
-// Extracted from lib/store.js — analysis history section
+/**
+ * store/analysis.js — Write-through cache for AI analysis history.
+ * Memory array is the working source of truth; DuckDB is the persistent store.
+ * Action files use the same sync interface as before.
+ */
 
 const fs   = require('fs');
 const path = require('path');
+const db   = require('./db');
 
 let _getMode = () => 'demo';
-let _dataDir = './data';
 const analysisHistories = { demo: [], live: [] };
 
-function _file(mode) { return path.join(_dataDir, `analysis-${mode}.json`); }
-
-function init(getMode, dataDir) {
+async function init(getMode, dataDir) {
   _getMode = getMode;
-  _dataDir = dataDir;
-  for (const mode of ['demo', 'live']) {
+  const accountId = db.getAccountId();
+
+  for (const env of ['demo', 'live']) {
     try {
-      const newFile = _file(mode);
-      const oldFile = path.join(dataDir, 'analysis-history.json');
-      if (fs.existsSync(newFile)) {
-        analysisHistories[mode] = JSON.parse(fs.readFileSync(newFile, 'utf8'));
-        console.log(`[analysis:${mode}] loaded ${analysisHistories[mode].length} records`);
-      } else if (mode === 'demo' && fs.existsSync(oldFile)) {
-        analysisHistories[mode] = JSON.parse(fs.readFileSync(oldFile, 'utf8'));
-        console.log(`[analysis:${mode}] migrated ${analysisHistories[mode].length} records from old file`);
+      const rows = await db.all(
+        `SELECT * FROM analysis WHERE account_id = ? AND env = ? ORDER BY ts ASC`,
+        [accountId, env]
+      );
+      analysisHistories[env] = rows.map(_fromRow);
+      if (rows.length) console.log(`[analysis:${env}] loaded ${rows.length} from DB`);
+    } catch (e) {
+      console.error(`[analysis:${env}] DB load error`, e.message);
+    }
+
+    // Migrate from legacy JSON if DB was empty
+    if (analysisHistories[env].length === 0) {
+      const files = [
+        path.join(dataDir, `analysis-${env}.json`),
+        env === 'demo' ? path.join(dataDir, 'analysis-history.json') : null,
+      ].filter(Boolean);
+
+      for (const file of files) {
+        try {
+          if (fs.existsSync(file)) {
+            analysisHistories[env] = JSON.parse(fs.readFileSync(file, 'utf8'));
+            console.log(`[analysis:${env}] migrated ${analysisHistories[env].length} from JSON`);
+            _saveAllAsync(env).catch(e => console.error('[analysis] migrate save error', e.message));
+            break;
+          }
+        } catch (e) { console.error(`[analysis:${env}] JSON migrate error`, e.message); }
       }
-    } catch (e) { console.error(`[analysis:${mode}] load error`, e.message); }
+    }
   }
 }
 
 function analysisHistory() { return analysisHistories[_getMode()]; }
 
 function saveAnalysisHistory() {
-  const mode = _getMode();
-  try {
-    const hist = analysisHistories[mode];
-    if (hist.length > 200) analysisHistories[mode] = hist.slice(-200);
-    fs.writeFileSync(_file(mode), JSON.stringify(analysisHistories[mode]));
-  } catch (e) { console.error('[analysis] save error', e.message); }
+  const env = _getMode();
+  const hist = analysisHistories[env];
+  if (hist.length > 200) analysisHistories[env] = hist.slice(-200);
+  _saveAllAsync(env).catch(e => console.error('[analysis] save error', e.message));
 }
 
 function parseAnalysis(raw) {
@@ -46,6 +65,39 @@ function parseAnalysis(raw) {
     bull: bullMatch ? parseInt(bullMatch[1]) : 0,
     bear: bullMatch ? parseInt(bullMatch[2]) : 0,
     atr:  atrMatch  ? parseFloat(atrMatch[1].replace(/,/g, '')) : null,
+  };
+}
+
+// ── Internal ───────────────────────────────────────────────────────────────
+
+async function _saveAllAsync(env) {
+  const accountId = db.getAccountId();
+  for (const entry of analysisHistories[env]) {
+    const id = String(entry.ts);
+    await db.run(
+      `INSERT OR REPLACE INTO analysis
+       (account_id, env, id, inst, bar, ts, raw, bull, bear, atr, claude_response)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [accountId, env, id,
+       entry.inst ?? '', entry.bar ?? '',
+       entry.ts ?? 0, entry.raw ?? '',
+       entry.bull ?? 0, entry.bear ?? 0,
+       entry.atr ?? null,
+       entry.claudeResponse ?? null]
+    );
+  }
+}
+
+function _fromRow(r) {
+  return {
+    ts:            Number(r.ts),
+    inst:          r.inst,
+    bar:           r.bar,
+    raw:           r.raw,
+    bull:          r.bull,
+    bear:          r.bear,
+    atr:           r.atr,
+    claudeResponse: r.claude_response ?? undefined,
   };
 }
 

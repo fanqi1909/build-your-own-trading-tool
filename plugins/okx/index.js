@@ -10,6 +10,7 @@ const path = require('path');
 const fs   = require('fs');
 
 const adapter  = require('./adapter');
+const db       = require('./store/db');
 const orders   = require('./store/orders');
 const candles  = require('./store/candles');
 const analysis = require('./store/analysis');
@@ -31,11 +32,15 @@ async function register(ctx) {
   // Attach adapter
   ctx.adapter = adapter;
 
-  // Initialize stores
-  orders.init(ctx.getMode, ctx.dataDir);
+  // Initialize shared DB first (sets account_id, creates tables)
+  await db.init(ctx.dataDir);
+  ctx.db = db;
+
+  // Initialize stores (db must be ready before these)
+  await orders.init(ctx.getMode, ctx.dataDir);
   await candles.init(ctx.getMode, ctx.dataDir);
-  analysis.init(ctx.getMode, ctx.dataDir);
-  postrack.init(ctx.getMode, ctx.dataDir);
+  await analysis.init(ctx.getMode, ctx.dataDir);
+  await postrack.init(ctx.getMode, ctx.dataDir);
 
   ctx.stores = { orders, candles, analysis, postrack };
 
@@ -53,6 +58,7 @@ async function register(ctx) {
 
   // Register cleanup on stop
   ctx.onStop.push(() => candles.closeDB());
+  ctx.onStop.push(() => db.close());
 
   // Register all action modules
   const registrations = ACTION_MODULES.map(name =>
