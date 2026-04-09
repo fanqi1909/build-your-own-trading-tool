@@ -53,6 +53,8 @@ function savePosTrackHistory() {
 
 // ── Internal ───────────────────────────────────────────────────────────────
 
+const POSTRACK_RETENTION = 200;
+
 async function _saveAllAsync(env) {
   const accountId = db.getAccountId();
   for (const entry of posTrackHistories[env]) {
@@ -61,6 +63,14 @@ async function _saveAllAsync(env) {
       [accountId, env, String(entry.ts), entry.ts, entry.text ?? '']
     );
   }
+  // Trim DB to retention limit
+  await db.run(
+    `DELETE FROM postrack WHERE account_id = ? AND env = ? AND id NOT IN (
+       SELECT id FROM postrack WHERE account_id = ? AND env = ?
+       ORDER BY ts DESC LIMIT ?
+     )`,
+    [accountId, env, accountId, env, POSTRACK_RETENTION]
+  );
 }
 
 module.exports = { init, posTrackHistories, posTrackHistory, savePosTrackHistory };

@@ -51,6 +51,8 @@ async function init(getMode, dataDir) {
 
 function getCandleConn() { return _conn; }
 
+const CANDLE_RETENTION = 2000; // max candles per inst+bar
+
 async function upsertCandles(inst, bar, candles) {
   if (!candles.length) return;
   for (const c of candles) {
@@ -59,6 +61,14 @@ async function upsertCandles(inst, bar, candles) {
       [inst, bar, c.ts, c.o, c.h, c.l, c.c, c.vol]
     );
   }
+  // Trim oldest candles beyond retention limit
+  await _dbRun(
+    `DELETE FROM candles WHERE inst = ? AND bar = ? AND ts < (
+       SELECT ts FROM candles WHERE inst = ? AND bar = ?
+       ORDER BY ts DESC LIMIT 1 OFFSET ?
+     )`,
+    [inst, bar, inst, bar, CANDLE_RETENTION - 1]
+  );
 }
 
 async function loadCandlesFromDB(inst, bar, limit = 500) {

@@ -70,6 +70,8 @@ function parseAnalysis(raw) {
 
 // ── Internal ───────────────────────────────────────────────────────────────
 
+const ANALYSIS_RETENTION = 200;
+
 async function _saveAllAsync(env) {
   const accountId = db.getAccountId();
   for (const entry of analysisHistories[env]) {
@@ -86,6 +88,14 @@ async function _saveAllAsync(env) {
        entry.claudeResponse ?? null]
     );
   }
+  // Trim DB to retention limit
+  await db.run(
+    `DELETE FROM analysis WHERE account_id = ? AND env = ? AND id NOT IN (
+       SELECT id FROM analysis WHERE account_id = ? AND env = ?
+       ORDER BY ts DESC LIMIT ?
+     )`,
+    [accountId, env, accountId, env, ANALYSIS_RETENTION]
+  );
 }
 
 function _fromRow(r) {

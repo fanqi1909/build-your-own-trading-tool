@@ -22,3 +22,7 @@ primary_region = "nrt"           # Tokyo — closest to OKX servers
 
 [env]
   PORT = "3000"
+
+[[mounts]]
+  source      = "trading_data"
+  destination = "/app/data"
