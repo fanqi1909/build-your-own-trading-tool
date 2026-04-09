@@ -14,7 +14,7 @@ const UI_MODE_KEY = 'uiMode';
 class App {
   constructor() {
     this.bus         = new EventBus();
-    this.ws          = new WsClient(`ws://${location.host}`, this.bus);
+    this.ws          = new WsClient(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`, this.bus);
     this.layout      = null;
     this.chat        = null;
     this.builder     = null;
