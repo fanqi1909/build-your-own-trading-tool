@@ -33,7 +33,12 @@ class App {
 
     this.catalog = await this._loadCatalog();
 
-    this.builder = new BuilderPanel(document.getElementById('builder-panel'), this.layout, this.catalog, () => this._setUiMode('use'));
+    this.builder = new BuilderPanel(
+      document.getElementById('build-topbar'),
+      document.getElementById('build-left'),
+      this.layout, this.catalog,
+      () => this._setUiMode('use')
+    );
     await this.builder.init();
     this._initBuildButton();
 
@@ -82,8 +87,10 @@ class App {
     this.uiMode = mode;
     document.body.dataset.uiMode = mode;
 
-    const builderPanel = document.getElementById('builder-panel');
-    if (builderPanel) builderPanel.hidden = mode !== 'build';
+    const topbar = document.getElementById('build-topbar');
+    const left   = document.getElementById('build-left');
+    if (topbar) topbar.hidden = mode !== 'build';
+    if (left)   left.hidden   = mode !== 'build';
 
     this._renderLayoutDecorations();
     this.bus.emit('ui:mode-changed', { mode });
@@ -254,7 +261,7 @@ class App {
     add.innerHTML = '<div class="panel__add-widget">＋ Add widget</div>';
     add.addEventListener('click', () => {
       this._setUiMode('build');
-      document.getElementById('builder-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('build-left')?.scrollTo({ top: 0, behavior: 'smooth' });
     });
     grid.appendChild(add);
   }

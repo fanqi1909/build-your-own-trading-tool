@@ -1,21 +1,22 @@
 /**
- * public/core/builder.js — Dashboard builder side panel
+ * public/core/builder.js — Build mode UI (topbar + left panel)
  */
 import { groupBuilderSections, getSuggestedTabs } from './suggestions.js';
 
 const PRESETS = [
-  { id: 'watch',   icon: '👁', label: 'Watch Market',  desc: 'Price ticker + candlestick chart', components: ['ticker', 'chart'] },
-  { id: 'analyze', icon: '📊', label: 'Analyze',       desc: 'Chart + indicators + AI assessment', components: ['ticker', 'chart', 'analysis', 'claude-insights'] },
-  { id: 'trade',   icon: '⚡', label: 'Trade',         desc: 'Trading setup with orders and positions', components: ['ticker', 'chart', 'order-panel', 'positions', 'open-orders'] },
-  { id: 'full',    icon: '🔲', label: 'Full Dashboard',desc: 'Everything enabled', components: ['ticker', 'balance', 'chart', 'analysis', 'order-panel', 'positions', 'open-orders', 'position-track', 'claude-insights', 'history', 'trade-review'] },
+  { id: 'watch',   icon: '👁', label: 'Watch',   components: ['ticker', 'chart'] },
+  { id: 'analyze', icon: '📊', label: 'Analyze',  components: ['ticker', 'chart', 'analysis', 'claude-insights'] },
+  { id: 'trade',   icon: '⚡', label: 'Trade',    components: ['ticker', 'chart', 'order-panel', 'positions', 'open-orders'] },
+  { id: 'full',    icon: '🔲', label: 'Full',     components: ['ticker', 'balance', 'chart', 'analysis', 'order-panel', 'positions', 'open-orders', 'position-track', 'claude-insights', 'history', 'trade-review'] },
 ];
 
 export class BuilderPanel {
-  constructor(panelEl, layout, catalog, onDone) {
-    this.el      = panelEl;
-    this.layout  = layout;
-    this.catalog = catalog;
-    this.onDone  = onDone;
+  constructor(topbarEl, leftEl, layout, catalog, onDone) {
+    this.topbarEl = topbarEl;
+    this.leftEl   = leftEl;
+    this.layout   = layout;
+    this.catalog  = catalog;
+    this.onDone   = onDone;
   }
 
   async init() {
@@ -27,146 +28,86 @@ export class BuilderPanel {
     this.render();
   }
 
-  show() {
-    this.el.hidden = false;
-    this.render();
-  }
-
-  hide() {
-    this.el.hidden = true;
-  }
-
   render() {
-    if (!this.el) return;
+    this._renderTopbar();
+    this._renderLeft();
+  }
 
-    const activeTab = this.layout.getActiveTab();
+  _renderTopbar() {
+    if (!this.topbarEl) return;
     const suggestedTabs = getSuggestedTabs(this.layout.listTabs());
-    const { recommended, available, removed } = groupBuilderSections(
+
+    this.topbarEl.innerHTML = `
+      <span class="btb__label">Presets</span>
+      ${PRESETS.map(p => `
+        <button class="btb__preset" data-preset="${p.id}">${p.icon} ${p.label}</button>
+      `).join('')}
+      <span class="btb__sep"></span>
+      ${suggestedTabs.length ? `<button class="btb__new-tab" id="btb-new-tab">＋ New Tab</button>` : ''}
+      <button class="btb__done" id="btb-done">Done ✓</button>
+    `;
+
+    this.topbarEl.querySelectorAll('.btb__preset[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => this._applyPreset(btn.dataset.preset));
+    });
+
+    this.topbarEl.querySelector('#btb-done')?.addEventListener('click', () => this.onDone());
+
+    this.topbarEl.querySelector('#btb-new-tab')?.addEventListener('click', async () => {
+      const suggested = suggestedTabs[0];
+      if (suggested) {
+        await this.layout.addTab(suggested.title, suggested.components);
+        this.render();
+      }
+    });
+  }
+
+  _renderLeft() {
+    if (!this.leftEl) return;
+    const { active, available, removed } = groupBuilderSections(
       this.catalog,
       this.layout.list(),
       this.layout.listRecentlyRemoved()
     );
 
-    this.el.innerHTML = `
-      <div class="builder__header">
-        <div>
-          <div class="builder__title">Build Your Dashboard</div>
-          <div class="builder__section-title">Editing tab: ${activeTab.title}</div>
-        </div>
-        <button class="builder__done" id="builder-done">Done</button>
-      </div>
+    this.leftEl.innerHTML = `
+      <div class="bl__section-title">Active</div>
+      ${active.length
+        ? active.map(item => this._row(item, 'remove')).join('')
+        : '<div class="builder__empty">Empty tab</div>'}
 
-      <div class="builder__section">
-        <div class="builder__section-title">AI Suggested Tabs</div>
-        <div class="builder__presets">
-          ${suggestedTabs.map(tab => `
-            <div class="builder__preset builder__preset--tab" data-suggested-tab="${tab.id}">
-              <div class="builder__preset-icon">${tab.icon}</div>
-              <div class="builder__preset-label">${tab.title}</div>
-              <div class="builder__preset-desc">${tab.reason}</div>
-              <button class="builder__component-action builder__component-action--add" data-create-tab="${tab.id}">Create Tab</button>
-            </div>
-          `).join('') || '<div class="builder__empty">You already have the main tab structure.</div>'}
-        </div>
-      </div>
+      <div class="bl__section-title" style="margin-top:8px">Add</div>
+      ${available.length
+        ? available.map(item => this._row(item, 'add')).join('')
+        : '<div class="builder__empty">All added</div>'}
 
-      <div class="builder__section">
-        <div class="builder__section-title">Recommended Presets</div>
-        <div class="builder__presets">
-          ${PRESETS.map(p => `
-            <div class="builder__preset" data-preset="${p.id}">
-              <div class="builder__preset-icon">${p.icon}</div>
-              <div class="builder__preset-label">${p.label}</div>
-              <div class="builder__preset-desc">${p.desc}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-
-      <div class="builder__section">
-        <div class="builder__section-title">AI Suggests For This Tab</div>
-        <div class="builder__components builder__components--recommended">
-          ${recommended.map(item => this._card(item, 'add')).join('') || '<div class="builder__empty">This tab already includes the top recommendations.</div>'}
-        </div>
-      </div>
-
-      <div class="builder__section">
-        <div class="builder__section-title">Available Components</div>
-        <div class="builder__components">
-          ${available.map(item => this._card(item, 'add')).join('') || '<div class="builder__empty">No more components available.</div>'}
-        </div>
-      </div>
-
-      <div class="builder__section">
-        <div class="builder__section-title">Recently Removed</div>
-        <div class="builder__components">
-          ${removed.map(item => this._card(item, 'restore')).join('') || '<div class="builder__empty">Nothing removed recently.</div>'}
-        </div>
-      </div>
+      ${removed.length ? `
+        <div class="bl__section-title" style="margin-top:8px">Recently Removed</div>
+        ${removed.map(item => this._row(item, 'restore')).join('')}
+      ` : ''}
     `;
 
-    this.el.querySelector('#builder-done')?.addEventListener('click', () => this.onDone());
-    this.el.querySelectorAll('.builder__preset[data-preset]').forEach(el => el.addEventListener('click', () => this._applyPreset(el.dataset.preset)));
-    this.el.querySelectorAll('[data-create-tab]').forEach(el => el.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const suggested = suggestedTabs.find(tab => tab.id === el.dataset.createTab);
-      if (!suggested) return;
-      await this.layout.addTab(suggested.title, suggested.components);
-      this.render();
-    }));
-    this.el.querySelectorAll('.builder__component-action[data-component]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = el.dataset.component;
-        const action = el.dataset.action;
-        if (action === 'add' || action === 'restore') this.layout.restore(id).then(() => this.render());
+    this.leftEl.querySelectorAll('.bl__btn[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id     = btn.dataset.id;
+        const action = btn.dataset.action;
+        if (action === 'remove') {
+          this.layout.remove(id);
+        } else {
+          this.layout.restore(id).then(() => this.render());
+        }
       });
     });
   }
 
-  _card(item, action) {
-    const label = action === 'restore' ? 'Restore' : 'Add';
-    const ioTags = [
-      ...(item.inputs  || []).map(k => `<span class="builder__io-tag builder__io-tag--in"  title="reads ${k}">↓${k}</span>`),
-      ...(item.outputs || []).map(k => `<span class="builder__io-tag builder__io-tag--out" title="writes ${k}">↑${k}</span>`),
-    ].join('');
-
-    const schemaKeys = Object.keys(item.configSchema || {});
-    const configRows = schemaKeys.map(key => {
-      const s = item.configSchema[key];
-      if (s.type === 'select') {
-        return `<div class="builder__cfg-row">
-          <label class="builder__cfg-label">${s.label}</label>
-          <select class="builder__cfg-input" data-cfg-key="${key}" data-component="${item.id}">
-            ${(s.options || []).map(o => `<option value="${o}">${o}</option>`).join('')}
-          </select>
-        </div>`;
-      }
-      if (s.type === 'boolean') {
-        return `<div class="builder__cfg-row">
-          <label class="builder__cfg-label">${s.label}</label>
-          <input class="builder__cfg-check" type="checkbox" data-cfg-key="${key}" data-component="${item.id}" checked>
-        </div>`;
-      }
-      if (s.type === 'number') {
-        return `<div class="builder__cfg-row">
-          <label class="builder__cfg-label">${s.label}</label>
-          <input class="builder__cfg-input builder__cfg-input--sm" type="number" data-cfg-key="${key}" data-component="${item.id}" value="${s.default ?? ''}" min="${s.min ?? ''}" max="${s.max ?? ''}">
-        </div>`;
-      }
-      return '';
-    }).join('');
-
+  _row(item, action) {
+    const icon   = action === 'remove'  ? '−' : action === 'restore' ? '↩' : '＋';
+    const modCls = `bl__btn--${action === 'remove' ? 'remove' : action === 'restore' ? 'restore' : 'add'}`;
+    const nameCls = action === 'remove' ? 'bl__name--active' : '';
     return `
-      <div class="builder__component" data-component="${item.id}">
-        <div class="builder__component-icon">${item.icon}</div>
-        <div class="builder__component-info">
-          <div class="builder__component-label">${item.title}</div>
-          <div class="builder__component-desc">${item.description}</div>
-          ${ioTags ? `<div class="builder__io-tags">${ioTags}</div>` : ''}
-          ${configRows ? `<details class="builder__cfg"><summary class="builder__cfg-toggle">Configure</summary>${configRows}</details>` : ''}
-        </div>
-        <button class="builder__component-action builder__component-action--${action}" data-component="${item.id}" data-action="${action}">${label}</button>
+      <div class="bl__row">
+        <span class="bl__name ${nameCls}" title="${item.title}">${item.title}</span>
+        <button class="bl__btn ${modCls}" data-id="${item.id}" data-action="${action}" title="${action} ${item.title}">${icon}</button>
       </div>
     `;
   }
@@ -174,7 +115,6 @@ export class BuilderPanel {
   async _applyPreset(presetId) {
     const preset = PRESETS.find(p => p.id === presetId);
     if (!preset) return;
-
     for (const id of this.layout.list()) {
       if (!preset.components.includes(id)) this.layout.remove(id);
     }
