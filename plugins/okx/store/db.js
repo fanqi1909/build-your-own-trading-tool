@@ -65,6 +65,7 @@ async function init(dataDir) {
     const database = new duckdb.Database(dbPath, err => err ? reject(err) : resolve(database));
   });
   _conn = _db.connect();
+  await _run(`PRAGMA memory_limit='128MB'`);
 
   await _run(`
     CREATE TABLE IF NOT EXISTS orders (

@@ -31,6 +31,8 @@ async function init(getMode, dataDir) {
   const dbPath = path.join(dataDir, 'candles.duckdb');
   _db   = new duckdb.Database(dbPath);
   _conn = _db.connect();
+  await _dbRun(`PRAGMA memory_limit='128MB'`);
+
   await _dbRun(`
     CREATE TABLE IF NOT EXISTS candles (
       inst VARCHAR,
