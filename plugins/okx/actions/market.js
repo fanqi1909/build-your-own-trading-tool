@@ -24,6 +24,29 @@ function register(ctx) {
   const { adapter, bus, cache, stores, refresh, getMode } = ctx;
   const ANALYZE_PY = process.env.ANALYZE_PY || path.join(__dirname, '../../../analyze.py');
 
+  // Instrument metadata cache: instId → { instId, baseCcy, ctVal, lotSz, minSz, tickSz, maxLever }
+  cache.instruments = {};
+
+  async function _loadInstruments() {
+    try {
+      const raw = await adapter.fetchInstruments(getMode());
+      for (const inst of raw) {
+        cache.instruments[inst.instId] = {
+          instId:   inst.instId,
+          baseCcy:  inst.ctBaseCcy || inst.baseCcy || inst.instId.split('-')[0],
+          ctVal:    inst.ctVal    || '1',
+          lotSz:    inst.lotSz   || '1',
+          minSz:    inst.minSz   || '1',
+          tickSz:   inst.tickSz  || '0.1',
+          maxLever: inst.lever   || '125',
+        };
+      }
+      console.log(`[instruments] loaded ${raw.length} SWAP instruments`);
+    } catch (e) {
+      console.warn('[instruments] failed to load:', e.message);
+    }
+  }
+
   async function fastRefresh(inst = 'BTC-USDT') {
     try {
       cache.ticker = await adapter.fetchTicker(inst, getMode());
@@ -105,6 +128,23 @@ function register(ctx) {
         return { type: 'atrData', error: e.message };
       }
     },
+
+    async fetchInstruments() {
+      const list = Object.values(cache.instruments);
+      if (!list.length) await _loadInstruments();
+      return { type: 'instrumentList', instruments: Object.values(cache.instruments) };
+    },
+
+    async fetchInstrumentMeta(msg) {
+      const inst = msg?.inst;
+      if (!inst) return { type: 'instrumentMeta', inst, meta: null };
+      let meta = cache.instruments[inst];
+      if (!meta) {
+        await _loadInstruments();
+        meta = cache.instruments[inst] || null;
+      }
+      return { type: 'instrumentMeta', inst, meta };
+    },
   };
 
   const timers = [
@@ -113,6 +153,7 @@ function register(ctx) {
   ];
 
   async function onReady() {
+    _loadInstruments(); // warm cache in background, don't block startup
     await fastRefresh();
     await candleRefresh();
   }

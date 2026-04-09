@@ -12,6 +12,8 @@ function makeTab(id, title = 'New Tab') {
     context: {
       instrument: 'BTC-USDT-SWAP',
       bar: '15m',
+      watchlist: ['BTC-USDT-SWAP', 'ETH-USDT-SWAP', 'SOL-USDT-SWAP'],
+      leverage: 10,
     },
     layout: {
       active: [],
@@ -329,7 +331,11 @@ export class LayoutManager {
 export function migrateState(saved, defaults = []) {
   if (saved?.version === 3 && Array.isArray(saved.tabs) && saved.tabs.length) {
     saved.tabs.forEach(tab => {
-      tab.context = tab.context || { instrument: 'BTC-USDT-SWAP', bar: '15m' };
+      tab.context = tab.context || {};
+      tab.context.instrument = tab.context.instrument || 'BTC-USDT-SWAP';
+      tab.context.bar        = tab.context.bar        || '15m';
+      tab.context.watchlist  = tab.context.watchlist  || ['BTC-USDT-SWAP', 'ETH-USDT-SWAP', 'SOL-USDT-SWAP'];
+      tab.context.leverage   = tab.context.leverage   ?? 10;
       tab.layout.active = (tab.layout.active || []).map(normalizeItem);
       tab.layout.removed = tab.layout.removed || [];
     });

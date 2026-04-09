@@ -9,7 +9,9 @@ export default class OrderPanelComponent extends Component {
     this._side = 'buy';
     this._ordType = 'limit';
     this._lastPrice = null;
-    this._instrument = this.getContext().instrument || 'BTC-USDT-SWAP';
+    const ctx = this.getContext();
+    this._instrument = ctx.instrument || 'BTC-USDT-SWAP';
+    this._leverage   = ctx.leverage   ?? 10;
 
     this.el.innerHTML = `
       <div class="op-card">
@@ -70,12 +72,41 @@ export default class OrderPanelComponent extends Component {
     this.on('ticker', (msg) => this._onTicker(msg));
     this.on('orderStream', (msg) => this._onOrderStream(msg));
     this.on('orderResult', (msg) => this._onOrderResult(msg));
-    this.onContextChange(({ context, changedKeys }) => {
-      if (!changedKeys?.includes('instrument')) return;
-      this._instrument = context.instrument || this._instrument;
-      const instEl = this.el.querySelector('#op-inst');
-      if (instEl) instEl.textContent = this._formatInst(this._instrument);
+    this.on('instrumentMeta', ({ inst, meta }) => {
+      if (inst === this._instrument && meta) this._applyMeta(meta);
     });
+
+    this.onContextChange(({ context, changedKeys }) => {
+      if (changedKeys?.includes('instrument')) {
+        this._instrument = context.instrument || this._instrument;
+        const instEl = this.el.querySelector('#op-inst');
+        if (instEl) instEl.textContent = this._formatInst(this._instrument);
+        this.send('fetchInstrumentMeta', { inst: this._instrument });
+      }
+      if (changedKeys?.includes('leverage')) {
+        this._leverage = context.leverage ?? this._leverage;
+        const leverEl = this.el.querySelector('#op-lever');
+        if (leverEl) leverEl.value = this._leverage;
+      }
+    });
+
+    // Initial metadata fetch + set leverage from context
+    this.send('fetchInstrumentMeta', { inst: this._instrument });
+    const leverEl = this.el.querySelector('#op-lever');
+    if (leverEl) leverEl.value = this._leverage;
+  }
+
+  _applyMeta(meta) {
+    const szEl    = this.el.querySelector('#op-sz');
+    const pxEl    = this.el.querySelector('#op-px');
+    const leverEl = this.el.querySelector('#op-lever');
+    if (szEl) {
+      szEl.min  = meta.minSz  || '1';
+      szEl.step = meta.lotSz  || '1';
+      if (parseFloat(szEl.value) < parseFloat(meta.minSz || '1')) szEl.value = meta.minSz || '1';
+    }
+    if (pxEl)    pxEl.step    = meta.tickSz   || '0.1';
+    if (leverEl) leverEl.max  = meta.maxLever  || '125';
   }
 
   _formatInst(inst) {

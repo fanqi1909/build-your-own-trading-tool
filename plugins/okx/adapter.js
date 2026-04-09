@@ -201,10 +201,16 @@ async function amendAlgoOrder({ inst, algoId, sl, tp }, mode) {
   await _run(args, mode);
 }
 
+async function fetchInstruments(mode) {
+  const data = await _run('public instruments --inst-type SWAP', mode);
+  return Array.isArray(data) ? data : [];
+}
+
 module.exports = {
   fetchTicker, fetchBalance, fetchPositions,
   fetchCandles, fetchCandlesBefore, fetchHistory,
   setLeverage, placeMarketOrder, placeLimitOrder, placeAlgoOrder,
   closePosition, fetchOpenOrders, cancelOrder, amendOrder,
   fetchAlgoOrders, amendAlgoOrder,
+  fetchInstruments,
 };

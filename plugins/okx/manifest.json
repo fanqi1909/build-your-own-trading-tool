@@ -15,6 +15,40 @@
   },
 
   "capabilities": {
+    "market.instrument-picker": {
+      "label": "Instrument Picker",
+      "description": "Browse and search all SWAP pairs. Click to set the active instrument; star to add to watchlist.",
+      "stage": "observe",
+      "component": "instrument-picker",
+      "inputs": ["instrument", "watchlist"],
+      "outputs": ["instrument", "watchlist"],
+      "configSchema": {
+        "favorites": {
+          "type": "array",
+          "label": "Favorites",
+          "description": "Pinned instruments shown at the top of the list",
+          "default": ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP"]
+        }
+      }
+    },
+    "market.watchlist": {
+      "label": "Watchlist",
+      "description": "Live price feed for your watchlisted instruments. Click any row to switch the active instrument.",
+      "stage": "observe",
+      "component": "watchlist",
+      "inputs": ["instrument", "watchlist"],
+      "outputs": ["instrument"],
+      "configSchema": {}
+    },
+    "trading.config": {
+      "label": "Trading Config",
+      "description": "Set default leverage, toggle Demo/Live mode, and view instrument trading specifications.",
+      "stage": "trade",
+      "component": "trading-config",
+      "inputs": ["instrument", "leverage"],
+      "outputs": ["leverage"],
+      "configSchema": {}
+    },
     "market.ticker": {
       "label": "Real-time Price",
       "description": "Live price, 24h change, high/low, volume. Updates every 5 s.",
