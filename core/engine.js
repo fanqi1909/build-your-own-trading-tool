@@ -17,6 +17,7 @@ const express = require('express');
 const { ServerBus }     = require('./bus');
 const { WsServer }      = require('./ws');
 const { TimerRegistry } = require('./timers');
+const { createAuth }    = require('./auth');
 
 class Engine {
   /**
@@ -63,6 +64,19 @@ class Engine {
     this.loadManifest();
 
     this._app = express();
+    this._app.use(express.json());
+
+    // ── Auth (enabled when APP_PASSWORD is set) ──────────────────────────────
+    let verifyWs = null;
+    if (process.env.APP_PASSWORD) {
+      const auth = createAuth(process.env.APP_PASSWORD);
+      this._app.post('/api/auth/login',  auth.loginHandler);
+      this._app.get('/api/auth/logout',  auth.logoutHandler);
+      this._app.use(auth.middleware);
+      verifyWs = auth.verifyWs;
+      console.log('[engine] auth enabled');
+    }
+
     this._app.use(express.static(this.staticDir));
 
     // Serve plugin client-side components at /plugins/:pluginId/...
@@ -76,7 +90,7 @@ class Engine {
     this._app.get('/api/manifest', (req, res) => res.json(this.manifest));
 
     this._server = http.createServer(this._app);
-    this.ws = new WsServer(this._server, this.bus);
+    this.ws = new WsServer(this._server, this.bus, { verifyClient: verifyWs });
 
     // Build shared context object passed to the plugin
     this._ctx = {

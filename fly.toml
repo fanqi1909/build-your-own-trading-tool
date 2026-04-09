@@ -1,0 +1,24 @@
+app = "okx-trading-dashboard"   # change to your actual fly app name
+primary_region = "nrt"           # Tokyo — closest to OKX servers
+
+[build]
+
+[http_service]
+  internal_port = 3000
+  force_https   = true
+  auto_stop_machines  = "stop"
+  auto_start_machines = true
+  min_machines_running = 0       # set to 1 if you want it always-on
+
+  [http_service.concurrency]
+    type       = "connections"
+    hard_limit = 20
+    soft_limit = 10
+
+[[vm]]
+  memory   = "512mb"
+  cpu_kind = "shared"
+  cpus     = 1
+
+[env]
+  PORT = "3000"

@@ -21,4 +21,4 @@ VOLUME /app/data
 
 EXPOSE 3000
 
-CMD ["node", "--watch", "server.js"]
+CMD ["/bin/sh", "start.sh"]

@@ -7,9 +7,11 @@
 const { WebSocketServer } = require('ws');
 
 class WsServer {
-  constructor(httpServer, bus) {
+  constructor(httpServer, bus, { verifyClient } = {}) {
     this.bus    = bus;
-    this._wss   = new WebSocketServer({ server: httpServer });
+    const wssOpts = { server: httpServer };
+    if (verifyClient) wssOpts.verifyClient = verifyClient;
+    this._wss   = new WebSocketServer(wssOpts);
     this._handlers       = new Map(); // action → async fn(params, ws)
     this._connectHandlers = [];       // called with ws on each new connection
 
