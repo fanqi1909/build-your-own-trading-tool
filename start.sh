@@ -3,6 +3,7 @@
 # Required env vars (set via fly secrets):
 #   OKX_DEMO_API_KEY, OKX_DEMO_SECRET_KEY, OKX_DEMO_PASSPHRASE
 #   APP_PASSWORD
+#   ANTHROPIC_API_KEY
 
 set -e
 

@@ -10,6 +10,7 @@
     "test:integration": "node --test tests/server.test.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.86.1",
     "duckdb": "^1.4.4",
     "express": "^4.18.2",
     "lightweight-charts": "^5.1.0",

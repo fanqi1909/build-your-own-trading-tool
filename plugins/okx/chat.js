@@ -1,94 +1,68 @@
 'use strict';
-// Extracted from lib/chat.js — Claude Code CLI chat session
+/**
+ * plugins/okx/chat.js — Claude AI chat session
+ *
+ * Uses @anthropic-ai/sdk directly (replaces claude CLI subprocess).
+ * Requires ANTHROPIC_API_KEY env var.
+ *
+ * Keeps the same public interface as before:
+ *   const session = new ChatSession(systemPrompt);
+ *   const result  = await session.send(message, onChunk);
+ *   session.reset();
+ */
 
-const { spawn }      = require('child_process');
-const readline       = require('readline');
-const path           = require('path');
-const { randomUUID } = require('crypto');
-const fs             = require('fs');
+const Anthropic = require('@anthropic-ai/sdk');
+const path      = require('path');
+const fs        = require('fs');
 
-const PROJECT_ROOT         = path.join(__dirname, '../..');
-const DEFAULT_SYSTEM_PROMPT = fs.readFileSync(path.join(__dirname, 'prompts/system.md'), 'utf8');
+const DEFAULT_SYSTEM_PROMPT = fs.readFileSync(
+  path.join(__dirname, 'prompts/system.md'), 'utf8'
+);
+
+const MODEL = 'claude-sonnet-4-6';
 
 class ChatSession {
   constructor(systemPrompt) {
-    this.sessionId    = randomUUID();
-    this.isFirst      = true;
-    this._systemPrompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
+    this._system   = systemPrompt || DEFAULT_SYSTEM_PROMPT;
+    this._messages = []; // conversation history: { role, content }[]
+    this._client   = new Anthropic.default();
   }
 
   reset() {
-    this.sessionId = randomUUID();
-    this.isFirst   = true;
+    this._messages = [];
   }
 
   /**
-   * Send a message and stream back events.
-   * Calls onChunk(text) for each text chunk.
-   * Returns the final result string.
+   * Send a message and stream back text chunks.
+   * @param {string}   message  - user message
+   * @param {Function} onChunk  - called with each text chunk as it arrives
+   * @returns {Promise<string>} - full assistant response
    */
   async send(message, onChunk) {
-    const args = [
-      '--model', 'claude-sonnet-4-6',
-      '-p', message,
-      '--output-format', 'stream-json',
-      '--verbose',
-      '--allowedTools', 'Read,Write,Edit,Glob,Grep,Bash',
-      '--max-turns', '10',
-      '--dangerously-skip-permissions',
-    ];
+    this._messages.push({ role: 'user', content: message });
 
-    if (this.isFirst) {
-      args.push('--session-id',    this.sessionId);
-      args.push('--system-prompt', this._systemPrompt);
-      this.isFirst = false;
-    } else {
-      args.push('--resume', this.sessionId);
-    }
+    let fullText = '';
 
-    // Remove CLAUDECODE to avoid nested-session conflicts
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-
-    const proc = spawn('claude', args, {
-      cwd:   PROJECT_ROOT,
-      env,
-      stdio: ['pipe', 'pipe', 'pipe'],
+    const stream = await this._client.messages.stream({
+      model:      MODEL,
+      max_tokens: 4096,
+      system:     this._system,
+      messages:   this._messages,
     });
 
-    proc.stdin.end();
-
-    const rl = readline.createInterface({ input: proc.stdout, crlfDelay: Infinity });
-    let finalResult = '';
-
-    for await (const line of rl) {
-      if (!line.trim()) continue;
-      let evt;
-      try { evt = JSON.parse(line); } catch { continue; }
-
-      if (evt.type === 'assistant') {
-        for (const block of evt.message?.content ?? []) {
-          if (block.type === 'text' && block.text) {
-            onChunk(block.text);
-          }
-        }
-      } else if (evt.type === 'result') {
-        finalResult = evt.result ?? '';
+    for await (const chunk of stream) {
+      if (
+        chunk.type === 'content_block_delta' &&
+        chunk.delta?.type === 'text_delta' &&
+        chunk.delta.text
+      ) {
+        fullText += chunk.delta.text;
+        onChunk(chunk.delta.text);
       }
     }
 
-    await new Promise((resolve, reject) => {
-      proc.on('close', (code) => {
-        if (code !== 0 && code !== null) {
-          reject(new Error(`claude exited with code ${code}`));
-        } else {
-          resolve();
-        }
-      });
-      proc.on('error', reject);
-    });
-
-    return finalResult;
+    this._messages.push({ role: 'assistant', content: fullText });
+    return fullText;
   }
 }
 
