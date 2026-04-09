@@ -3,7 +3,7 @@
 # Required env vars (set via fly secrets):
 #   OKX_DEMO_API_KEY, OKX_DEMO_SECRET_KEY, OKX_DEMO_PASSPHRASE
 #   APP_PASSWORD
-#   ANTHROPIC_API_KEY
+#   CLAUDE_CODE_OAUTH_TOKEN  (sk-ant-oat01-... from claude auth)
 
 set -e
 

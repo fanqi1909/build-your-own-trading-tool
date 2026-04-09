@@ -2,8 +2,8 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Install okx CLI globally (trade-dashboard depends on it)
-RUN npm install -g @okx_ai/okx-trade-cli@1.2.4
+# Install okx CLI and claude CLI globally
+RUN npm install -g @okx_ai/okx-trade-cli@1.2.4 @anthropic-ai/claude-code
 
 # Install Python for analyze.py
 RUN apt-get update && apt-get install -y --no-install-recommends python3 && \
