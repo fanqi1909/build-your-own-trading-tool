@@ -1,4 +1,4 @@
-app = "okx-trading-dashboard"   # change to your actual fly app name
+app = "my-trading"
 primary_region = "nrt"           # Tokyo — closest to OKX servers
 
 [build]
