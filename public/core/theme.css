@@ -147,12 +147,33 @@ body[data-ui-mode="build"] #build-left { display: block; }
   min-width: 0;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   grid-auto-rows: min-content;
-
   gap: var(--gap);
   padding: var(--gap);
-  align-content: start;
+  align-content: stretch;  /* stretch rows to fill remaining grid height */
+}
+
+/* Row wrappers are invisible to the CSS grid — slot children become direct grid items. */
+.layout-row {
+  display: contents;
+}
+
+/* Column slot — the actual CSS grid item; panels stack vertically inside it. */
+.layout-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+  position: relative;    /* for absolutely-positioned slot buttons */
+}
+/* grid-row is set inline by JS; grid-column by data-span */
+.layout-slot[data-span="1"] { grid-column: auto; }
+.layout-slot[data-span="2"] { grid-column: span 2; }
+.layout-slot[data-span="3"] { grid-column: 1 / -1; }
+
+.layout-slot > .panel {
+  flex: 1;               /* equal height share among stacked panels */
 }
 
 .layout-grid--build {
@@ -161,11 +182,10 @@ body[data-ui-mode="build"] #build-left { display: block; }
 .layout-grid--build .panel {
   box-shadow: inset 0 0 0 1px rgba(77,158,255,0.12);
 }
-
-/* Panel size — controlled via data-size attribute set by app.js */
-.panel[data-size="tile"] { grid-column: auto; }
-.panel[data-size="half"] { grid-column: span 2; }
-.panel[data-size="full"] { grid-column: 1 / -1; }
+.layout-grid--build .layout-slot.slot--stack-target {
+  box-shadow: 0 0 0 2px var(--blue);
+  border-radius: var(--radius);
+}
 
 .panel {
   background: var(--bg-card);
@@ -210,11 +230,12 @@ body[data-ui-mode="build"] .panel:hover .panel__drag-handle { opacity: 1; }
 .panel__drag-handle:hover { color: var(--text); }
 .panel__drag-handle:active { cursor: grabbing; }
 
-.panel__size-btn {
+/* Slot-level build-mode buttons (size + stack) — on .layout-slot, not .panel */
+.slot__size-btn,
+.slot__stack-btn {
   position: absolute;
-  top: 8px; right: 72px;
+  top: 8px;
   height: 24px;
-  padding: 0 7px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: rgba(0,0,0,0.25);
@@ -222,13 +243,29 @@ body[data-ui-mode="build"] .panel:hover .panel__drag-handle { opacity: 1; }
   cursor: pointer;
   opacity: 0;
   font-size: 10px;
+  transition: opacity var(--transition), color var(--transition), border-color var(--transition);
+  z-index: 1;
+}
+.slot__size-btn {
+  right: 8px;
+  padding: 0 7px;
   font-family: var(--font-mono);
   letter-spacing: 0.04em;
   white-space: nowrap;
-  transition: opacity var(--transition), color var(--transition);
 }
-body[data-ui-mode="build"] .panel:hover .panel__size-btn { opacity: 1; }
-.panel__size-btn:hover { color: var(--blue); border-color: var(--blue); }
+.slot__stack-btn {
+  right: 84px;
+  width: 24px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+body[data-ui-mode="build"] .layout-slot:hover .slot__size-btn,
+body[data-ui-mode="build"] .layout-slot:hover .slot__stack-btn { opacity: 1; }
+.slot__size-btn:hover  { color: var(--blue);   border-color: var(--blue); }
+.slot__stack-btn:hover { color: var(--green);  border-color: var(--green); }
+
+/* Legacy alias — keep for any stale references */
+.panel__size-btn { display: none; }
 
 .panel--dragging {
   opacity: 0.4;
@@ -583,6 +620,26 @@ body[data-ui-mode="build"] .panel:hover .panel__size-btn { opacity: 1; }
 .btb__done:hover { opacity: 0.85; }
 
 /* Build left panel elements */
+.bl__row-group {
+  margin-bottom: 4px;
+}
+.bl__row-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 6px 4px 2px;
+  opacity: 0.7;
+}
+.bl__size-tag {
+  font-size: 9px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  background: rgba(255,255,255,0.04);
+  border-radius: 2px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+}
 .bl__section-title {
   font-size: 10px;
   color: var(--text-dim);

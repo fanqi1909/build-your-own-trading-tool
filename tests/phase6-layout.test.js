@@ -47,16 +47,17 @@ async function run() {
     console.log(ok ? '[6.4] PASS — builder sections group active, available, and removed correctly' : '[6.4] FAIL — invalid builder grouping');
   }
 
-  // 6.5 old layout state migrates into one default tab
+  // 6.5 old layout state migrates into v5 slot-based tab
   {
     const migrated = migrateState({ active: [{ id: 'ticker', position: 'auto' }], removed: ['balance'] });
-    const ok = migrated.version === 3
+    const tab = migrated.tabs?.[0];
+    const firstPanel = tab?.layout?.rows?.[0]?.cols?.[0]?.panels?.[0];
+    const ok = migrated.version === 5
       && migrated.activeTabId === 'tab-1'
       && migrated.tabs.length === 1
-      && migrated.tabs[0].context.instrument === 'BTC-USDT-SWAP'
-      && migrated.tabs[0].layout.active[0].id === 'ticker'
-      && migrated.tabs[0].layout.active[0].config
-      && migrated.tabs[0].layout.removed.includes('balance');
+      && tab.context.instrument === 'BTC-USDT-SWAP'
+      && firstPanel?.id === 'ticker'
+      && typeof firstPanel?.config === 'object';
     console.log(ok ? '[6.5] PASS — old single-layout state migrates to tabbed state' : '[6.5] FAIL — old state migration incorrect');
   }
 
