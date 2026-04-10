@@ -101,12 +101,16 @@ export class BuilderPanel {
   }
 
   _row(item, action) {
-    const icon   = action === 'remove'  ? '−' : action === 'restore' ? '↩' : '＋';
-    const modCls = `bl__btn--${action === 'remove' ? 'remove' : action === 'restore' ? 'restore' : 'add'}`;
-    const nameCls = action === 'remove' ? 'bl__name--active' : '';
+    const icon    = action === 'remove' ? '−' : action === 'restore' ? '↩' : '＋';
+    const modCls  = `bl__btn--${action === 'remove' ? 'remove' : action === 'restore' ? 'restore' : 'add'}`;
+    const active  = action === 'remove';
+    const desc    = item.description ? `<span class="bl__desc">${item.description}</span>` : '';
     return `
-      <div class="bl__row">
-        <span class="bl__name ${nameCls}" title="${item.title}">${item.title}</span>
+      <div class="bl__row${active ? ' bl__row--active' : ''}">
+        <div class="bl__meta">
+          <span class="bl__name">${item.title}</span>
+          ${desc}
+        </div>
         <button class="bl__btn ${modCls}" data-id="${item.id}" data-action="${action}" title="${action} ${item.title}">${icon}</button>
       </div>
     `;

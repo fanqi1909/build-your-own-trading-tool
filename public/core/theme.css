@@ -149,6 +149,7 @@ body[data-ui-mode="build"] #build-left { display: block; }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   grid-auto-rows: min-content;
+  grid-auto-flow: row dense;
   gap: var(--gap);
   padding: var(--gap);
   align-content: start;
@@ -595,21 +596,37 @@ body[data-ui-mode="build"] .panel:hover .panel__size-btn { opacity: 1; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 4px;
+  padding: 6px 4px;
   border-radius: 4px;
   transition: background var(--transition);
 }
 .bl__row:hover { background: rgba(255,255,255,0.04); }
-.bl__name {
+.bl__row--active .bl__name { color: var(--text); }
+.bl__meta {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bl__name {
   font-size: 11px;
+  font-weight: 600;
   color: var(--text-muted);
   font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.bl__name--active { color: var(--text); }
+.bl__desc {
+  font-size: 9px;
+  color: var(--text-dim);
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 .bl__btn {
   width: 20px; height: 20px;
   border-radius: 50%;
