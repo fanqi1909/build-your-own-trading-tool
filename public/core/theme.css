@@ -149,7 +149,7 @@ body[data-ui-mode="build"] #build-left { display: block; }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   grid-auto-rows: min-content;
-  grid-auto-flow: row dense;
+
   gap: var(--gap);
   padding: var(--gap);
   align-content: start;
