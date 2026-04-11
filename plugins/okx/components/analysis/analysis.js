@@ -2,6 +2,7 @@ import { Component } from '/core/component.js';
 
 export default class AnalysisComponent extends Component {
   static id = 'analysis';
+  static inputs = ['instrument'];
 
   async init() {
     this._injectStyles();
@@ -34,6 +35,21 @@ export default class AnalysisComponent extends Component {
 
     this.on('analysis',        (msg) => this._onAnalysis(msg));
     this.on('analysisHistory', (msg) => this._onHistory(msg));
+
+    const ctx = this.getContext();
+    this._instrument = ctx.instrument || 'BTC-USDT-SWAP';
+  }
+
+  onInputChange(key, value) {
+    if (key === 'instrument') {
+      this._instrument = value;
+      this._history    = [];
+      this._viewingIdx = null;
+      this.el.querySelector('#an-output').textContent = 'Waiting for analysis…';
+      this.el.querySelector('#an-chips').innerHTML    = '';
+      this.el.querySelector('#an-signals').style.display = 'none';
+      this.send('triggerAnalysis', { inst: this._instrument });
+    }
   }
 
   _onAnalysis({ ts, inst, bar, raw, bull, bear, atr }) {

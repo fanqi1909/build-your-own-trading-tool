@@ -2,6 +2,7 @@ import { Component } from '/core/component.js';
 
 export default class ClaudeInsightsComponent extends Component {
   static id = 'claude-insights';
+  static inputs = ['instrument'];
 
   async init() {
     this._injectStyles();
@@ -36,6 +37,30 @@ export default class ClaudeInsightsComponent extends Component {
     this.on('claudeResponse', (msg) => this._onResponse(msg));
     this.on('claudeThinking', ()    => this._setThinking());
     this.on('claudeError',    (msg) => this._onError(msg));
+
+    const ctx = this.getContext();
+    this._instrument = ctx.instrument || 'BTC-USDT-SWAP';
+  }
+
+  onInputChange(key, value) {
+    if (key === 'instrument') {
+      this._instrument = value;
+      this._setStale();
+    }
+  }
+
+  _setStale() {
+    const body = this.el.querySelector('#ci-body');
+    if (body) {
+      body.innerHTML = `
+        <div class="claude-card__placeholder">
+          Instrument changed to <strong>${this._instrument.replace('-SWAP','')}</strong>.
+          Click "Ask Claude" to get fresh insights.
+        </div>
+      `;
+    }
+    const time = this.el.querySelector('#ci-time');
+    if (time) time.textContent = '—';
   }
 
   _setThinking() {

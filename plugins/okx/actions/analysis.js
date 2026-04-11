@@ -200,6 +200,13 @@ function register(ctx) {
       ctx._chatSession.reset();
       return { type: 'chatReset' };
     },
+
+    async triggerAnalysis(msg) {
+      const inst = (msg.inst || 'BTC-USDT').replace('-SWAP', '');
+      const bar  = msg.bar || '15m';
+      analysisRefresh(inst, bar).catch(e => console.error('[triggerAnalysis]', e.message));
+      return null; // response comes via broadcast
+    },
   };
 
   return {

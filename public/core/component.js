@@ -51,6 +51,33 @@ export class Component {
   }
 
   /**
+   * Framework hook — called automatically after init() for any key in static inputs
+   * that changes in the tab context. Subclasses override this instead of writing
+   * onContextChange boilerplate manually.
+   *
+   * @param {string} key   — the context key that changed (e.g. 'instrument')
+   * @param {*}      value — the new value
+   */
+  onInputChange(key, value) {}   // no-op default; override in subclass
+
+  /**
+   * Called by LayoutManager after init() to wire up the standard input-context
+   * subscription based on static inputs[]. Components should NOT call this directly.
+   */
+  _initContextInputs() {
+    const inputs = this.constructor.inputs || [];
+    if (!inputs.length) return;
+    this.onContextChange(({ context, changedKeys, sourceComponentId }) => {
+      if (sourceComponentId === this.constructor.id) return;
+      for (const key of inputs) {
+        if (changedKeys.includes(key) && context[key] !== undefined) {
+          this.onInputChange(key, context[key]);
+        }
+      }
+    });
+  }
+
+  /**
    * setStatus(state, message?)
    * state: 'loading' | 'ready' | 'error' | 'empty'
    * Shows an overlay on the panel; 'ready' removes it.

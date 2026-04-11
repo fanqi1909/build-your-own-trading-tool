@@ -48,19 +48,21 @@ export default class TickerComponent extends Component {
     });
 
     this.on('ticker', (msg) => this.update(msg));
-    this.onContextChange(({ context, changedKeys }) => {
-      if (!changedKeys?.includes('instrument')) return;
-      this._instrument = context.instrument || this._instrument;
-      const select = this.el.querySelector('#ticker-select');
-      if (select) select.value = this._instrument;
-      this.send('fetchTicker', { inst: this._instrument.replace('-SWAP', '') });
-    });
 
     this.send('fetchTicker', { inst: this._instrument.replace('-SWAP', '') });
   }
 
   _formatInst(inst) {
     return (inst || '').replace('-SWAP', '');
+  }
+
+  onInputChange(key, value) {
+    if (key === 'instrument') {
+      this._instrument = value;
+      const select = this.el.querySelector('#ticker-select');
+      if (select && select.value !== value) select.value = value;
+      this.send('fetchTicker', { inst: this._instrument.replace('-SWAP', '') });
+    }
   }
 
   update({ data, mode }) {

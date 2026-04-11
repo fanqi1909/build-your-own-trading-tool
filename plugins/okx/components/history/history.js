@@ -2,6 +2,7 @@ import { Component } from '/core/component.js';
 
 export default class HistoryComponent extends Component {
   static id = 'history';
+  static inputs = ['instrument'];
 
   async init() {
     this._injectStyles();
@@ -26,6 +27,16 @@ export default class HistoryComponent extends Component {
     this.on('tradeReviewClaudeError',    (msg) => this._onReviewClaudeError(msg));
     this.on('tradeReviewError',          (msg) => this._onReviewError(msg));
     this._activeOrdId = null;
+
+    const ctx = this.getContext();
+    this._instrument = ctx.instrument || null;
+  }
+
+  onInputChange(key, value) {
+    if (key === 'instrument') {
+      this._instrument = value;
+      this.send('history', { inst: this._instrument });
+    }
   }
 
   _render(history) {

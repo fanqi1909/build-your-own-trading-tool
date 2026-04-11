@@ -68,17 +68,23 @@ export default class ChartComponent extends Component {
     }
 
     this.on('candles', (msg) => this.update(msg));
-    this.onContextChange(({ context, changedKeys }) => {
-      if (!changedKeys?.some(k => k === 'instrument' || k === 'bar')) return;
-      this._currentInst = context.instrument || this._currentInst;
-      this._currentBar  = context.bar || this._currentBar;
-      this._syncHeader();
-      this._setActiveBar(this._currentBar);
-      this.send('candles', { inst: this._currentInst, bar: this._currentBar });
-    });
 
     this._syncHeader();
     this.send('candles', { inst: this._currentInst, bar: this._currentBar });
+  }
+
+  onInputChange(key, value) {
+    if (key === 'instrument') {
+      this._currentInst = value;
+      this._syncHeader();
+      this.send('candles', { inst: this._currentInst, bar: this._currentBar });
+    }
+    if (key === 'bar') {
+      this._currentBar = value;
+      this._syncHeader();
+      this._setActiveBar(this._currentBar);
+      this.send('candles', { inst: this._currentInst, bar: this._currentBar });
+    }
   }
 
   _formatInst(inst) {

@@ -88,7 +88,7 @@ export class LayoutManager {
       tabs: [makeTab('tab-1', 'Watch')],
     };
 
-    this.bus.on('context:patch', ({ patch, tabId }) => this.patchContext(patch, tabId));
+    this.bus.on('context:patch', ({ patch, tabId, sourceComponentId }) => this.patchContext(patch, tabId, sourceComponentId));
   }
 
   // ── Public API ─────────────────────────────────────────────────────────
@@ -317,7 +317,7 @@ export class LayoutManager {
     return { ...(this._state.tabs.find(t => t.id === tabId) || this.getActiveTab()).context };
   }
 
-  patchContext(patch, tabId = this._state.activeTabId) {
+  patchContext(patch, tabId = this._state.activeTabId, sourceComponentId = null) {
     const tab = this._state.tabs.find(t => t.id === tabId);
     if (!tab || !patch) return;
     const prev = { ...tab.context };
@@ -325,7 +325,7 @@ export class LayoutManager {
     const changedKeys = Object.keys(patch).filter(k => prev[k] !== tab.context[k]);
     if (!changedKeys.length) return;
     this.save();
-    this.bus.emit('context:changed', { tabId, context: { ...tab.context }, changedKeys });
+    this.bus.emit('context:changed', { tabId, context: { ...tab.context }, changedKeys, sourceComponentId });
     this.bus.emit('layout:changed', this.snapshot());
   }
 
@@ -506,6 +506,7 @@ export class LayoutManager {
     try {
       instance = new ComponentClass(el, this.bus, config);
       await instance.init();
+      instance._initContextInputs?.();
     } catch (err) {
       console.error(`[layout] ${componentId} failed to init:`, err);
       el.innerHTML = `<div class="panel__error">⚠ ${componentId} failed to load<br><small>${err.message}</small></div>`;
