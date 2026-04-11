@@ -1,356 +1,189 @@
-# Component I/O + Workspace Context Design
+# Component I/O + Workspace Context
 
-## Why this exists
+> Status: **Implemented** — this document describes the current working system.
 
-The project is evolving from a dashboard made of loosely connected panels into a true **workspace model**.
+## Overview
 
-We now have:
-- tabbed workspaces
-- Build / Use mode
-- AI recommendations for modules and tab structures
+Components in the same tab share a **workspace context** object. When one component writes a value (e.g. the instrument changes in the ticker), all other components in the same tab that declared that key as an `input` are automatically notified and can react.
 
-The next architectural step is to make component linkage explicit. Instead of treating panels as isolated UI blocks, we define:
-
-- **component inputs** — what state a component consumes
-- **component outputs** — what user-driven selections or changes it can publish
-- **workspace context** — shared tab-level state that linked components can react to
-
-A concrete example:
-- the user selects `BTC-USDT-SWAP` in the ticker
-- the current tab’s workspace context updates
-- chart, analysis, order-panel, positions, and open-orders can react consistently
-
----
-
-## Core idea
-
-Use two layers of state:
-
-### 1. Workspace context (shared, tab-level)
-This is state shared by multiple components inside the same tab.
-
-Initial recommended keys:
-
-```js
-{
-  instrument: 'BTC-USDT-SWAP',
-  bar: '15m'
-}
 ```
-
-Future-safe examples:
-
-```js
-{
-  instrument: 'BTC-USDT-SWAP',
-  bar: '1H',
-  selection: {
-    orderId: '123',
-    positionId: '456'
-  },
-  range: '30d'
-}
-```
-
-### 2. Component config (persistent, instance-level)
-This is configuration specific to one component instance.
-
-Examples:
-
-```js
-// ticker config
-{
-  symbols: ['BTC-USDT-SWAP', 'ETH-USDT-SWAP'],
-  preset: 'majors'
-}
-```
-
-```js
-// order-panel config
-{
-  defaultLeverage: 5,
-  defaultOrderType: 'limit'
-}
-```
-
-```js
-// chart config
-{
-  studies: ['ema', 'volume'],
-  publishBarChanges: true
-}
+ticker selects ETH-USDT-SWAP
+  → setContext({ instrument: 'ETH-USDT-SWAP' })
+  → tab.context updated + persisted to localStorage
+  → context:changed broadcast
+  → chart re-fetches ETH candles
+  → analysis triggers ETH analysis
+  → order-panel switches to ETH
+  → claude-insights shows stale indicator
+  → history re-fetches ETH trade history
 ```
 
 ---
 
-## Rule of thumb
+## Component Contract
 
-### Put state in **workspace context** if:
-- multiple components may need it
-- changing it should update other components in the same tab
-- it represents the current working focus of the tab
-
-Examples:
-- current instrument
-- current timeframe
-- shared row/order/position selection
-
-### Put state in **component config** if:
-- it belongs to one component only
-- it should persist for that component instance
-- changing it should not necessarily update other components
-
-Examples:
-- ticker watchlist symbols
-- order-panel defaults
-- chart visual preferences
-- analysis display preferences
-
----
-
-## Persisted state model
-
-Each tab should own both workspace context and layout items.
-
-Recommended tab shape:
+Every component should declare what context keys it reads and writes:
 
 ```js
-{
-  id: 'watch',
-  title: 'Watch',
-  context: {
-    instrument: 'BTC-USDT-SWAP',
-    bar: '15m'
-  },
-  layout: {
-    active: [
-      {
-        id: 'ticker',
-        position: 'auto',
-        config: {
-          symbols: ['BTC-USDT-SWAP', 'ETH-USDT-SWAP']
-        }
-      },
-      {
-        id: 'chart',
-        position: 'auto',
-        config: {}
-      }
-    ],
-    removed: []
+export default class MyComponent extends Component {
+  static id     = 'my-component';
+  static inputs  = ['instrument'];   // context keys this component reads
+  static outputs = ['instrument'];   // context keys this component writes
+}
+```
+
+### Reading context
+
+Call `this.getContext()` once in `init()` to get the current tab context:
+
+```js
+async init() {
+  const ctx = this.getContext();
+  this._instrument = ctx.instrument || 'BTC-USDT-SWAP';
+  // ... render with this._instrument
+}
+```
+
+### Reacting to context changes
+
+Override `onInputChange(key, value)` — the framework calls this automatically when any key listed in `static inputs` changes. No boilerplate needed.
+
+```js
+onInputChange(key, value) {
+  if (key === 'instrument') {
+    this._instrument = value;
+    this._refetch();
   }
 }
 ```
 
-This keeps all dashboard composition inside one persisted owner while clearly separating:
-- shared tab state
-- per-component configuration
+The framework guarantees:
+- Only fires for keys in `static inputs`
+- Never fires if this component itself wrote the change (no infinite loops)
+- Only fires for the active tab (inactive tabs are skipped)
 
----
+### Writing context
 
-## Event model
+Call `this.setContext(patch)` when the user makes a selection that other components should react to:
 
-We should continue to use the existing client-side event bus.
-
-Do **not** introduce direct component-to-component references.
-
-### Recommended events
-
-#### Write shared context
 ```js
-bus.emit('context:patch', {
-  patch: { instrument: 'BTC-USDT-SWAP' },
-  sourceComponentId: 'ticker',
-  tabId: 'watch'
-})
-```
-
-#### Notify listeners of changes
-```js
-bus.emit('context:changed', {
-  tabId: 'watch',
-  context: { instrument: 'BTC-USDT-SWAP', bar: '15m' },
-  changedKeys: ['instrument'],
-  sourceComponentId: 'ticker'
-})
-```
-
-Optional scoped events can be added later if helpful:
-- `context:instrument:changed`
-- `context:bar:changed`
-
----
-
-## Propagation flow
-
-Recommended flow:
-
-1. User interacts inside a component
-2. That component emits `context:patch`
-3. The active tab context is updated in layout-owned state
-4. The new state is persisted
-5. `context:changed` is emitted
-6. Other interested components react
-
-Example:
-
-```text
-ticker selection
-  → context:patch { instrument: 'BTC-USDT-SWAP' }
-  → tab.context.instrument updated
-  → context:changed
-  → chart refreshes
-  → analysis refreshes
-  → order-panel switches instrument
+selectEl.addEventListener('change', (e) => {
+  this._instrument = e.target.value;
+  this.setContext({ instrument: this._instrument });
+});
 ```
 
 ---
 
-## What should NOT go into workspace context
-
-Workspace context should stay semantic and lightweight.
-
-Do **not** put these into tab context:
-- latest ticker payload
-- candle arrays
-- analysis history blobs
-- positions / open-orders datasets
-- temporary loading state
-- server-fetched market data caches
-
-Those belong in:
-- streamed server data
-- component-local state
-- caches keyed by instrument/bar
-
----
-
-## Component contract direction
-
-The base component model should eventually support lightweight I/O metadata.
-
-Conceptually:
+## Full Component Example
 
 ```js
-static inputs = ['instrument', 'bar']
-static outputs = ['instrument']
-static defaultConfig = {
-  symbols: ['BTC-USDT-SWAP']
+import { Component } from '/core/component.js';
+
+export default class ExampleComponent extends Component {
+  static id      = 'example';
+  static inputs  = ['instrument'];
+  static outputs = ['instrument'];
+  static defaultConfig = { symbols: ['BTC-USDT-SWAP'] };
+
+  async init() {
+    // 1. Read current context once at startup
+    const ctx = this.getContext();
+    this._instrument = ctx.instrument || 'BTC-USDT-SWAP';
+
+    // 2. Render UI
+    this.el.innerHTML = `<select id="inst-select">...</select>`;
+
+    // 3. Write to context when user makes a selection
+    this.el.querySelector('#inst-select').addEventListener('change', (e) => {
+      this._instrument = e.target.value;
+      this.setContext({ instrument: this._instrument });
+    });
+
+    // 4. Subscribe to server-pushed data
+    this.on('someEvent', (msg) => this._onData(msg));
+  }
+
+  // 5. React to context changes from other components
+  onInputChange(key, value) {
+    if (key === 'instrument') {
+      this._instrument = value;
+      this._refetch();
+    }
+  }
 }
 ```
 
-And components should have small runtime helpers such as:
-- `getContext()`
-- `setContext(patch)`
-- `onContextChange(handler)`
-- `getConfig()`
-- `updateConfig(patch)`
+---
 
-This does **not** require a heavy framework. It simply makes the existing event-bus architecture more explicit and consistent.
+## Context Keys (current)
+
+| Key | Type | Who writes | Who reads |
+|-----|------|------------|-----------|
+| `instrument` | `string` e.g. `'BTC-USDT-SWAP'` | ticker, instrument-picker, watchlist | chart, order-panel, analysis, claude-insights, history |
+| `bar` | `string` e.g. `'15m'` | chart | chart (self), (future: analysis) |
 
 ---
 
-## First rollout targets
+## Workspace Context vs Component Config
 
-### 1. `ticker`
-**Inputs**
-- current `instrument`
+### Use **workspace context** when:
+- multiple components need the same value
+- changing it should update other panels in the same tab
+- it represents the current working focus (instrument, timeframe, selected order)
 
-**Outputs**
-- publishes new `instrument` when user selects a symbol
+### Use **component config** when:
+- the setting belongs to one component only
+- it should persist per instance
+- other components don't care about it
 
-**Config**
-- watchlist symbols
-- preset name
-
-### 2. `chart`
-**Inputs**
-- `instrument`
-- `bar`
-
-**Outputs**
-- publishes `bar` when the timeframe is changed
-
-**Config**
-- studies / visual options
-
-### 3. `order-panel`
-**Inputs**
-- `instrument`
-
-**Outputs**
-- none for shared context initially
-
-**Config**
-- default leverage
-- default order type
-
-### 4. `analysis`
-**Inputs**
-- `instrument`
-- `bar`
-
-**Outputs**
-- none initially
-
-**Config**
-- display / auto-run preferences
-
-### 5. `positions` / `open-orders`
-**Inputs**
-- `instrument` (for filtering or highlighting)
-
-**Outputs**
-- later may publish shared selection state
-
-**Config**
-- filters / sort preferences
+```js
+// Config example — per-instance, not shared
+static defaultConfig = {
+  symbols:          ['BTC-USDT-SWAP', 'ETH-USDT-SWAP'],
+  defaultLeverage:  5,
+  defaultOrderType: 'limit',
+}
+```
 
 ---
 
-## Migration path
+## How the Framework Wires It Up
 
-Recommended sequence:
+Implemented in `public/core/component.js` and `public/core/layout.js`.
 
-1. Extend tab state to include `context`
-2. Extend layout items to include `config`
-3. Add context helper API in core
-4. Add context events (`context:patch`, `context:changed`)
-5. Convert `chart` first
-6. Convert `order-panel`
-7. Convert `ticker`
-8. Convert `analysis`, `positions`, `open-orders`
-9. Surface component inputs/outputs metadata in docs and possibly manifest-driven tooling later
+**Write path:**
+```
+component.setContext(patch)
+  → bus.emit('context:patch', { patch, sourceComponentId, tabId })
+  → LayoutManager.patchContext()
+      diffs old vs new context
+      saves to localStorage
+      emits bus 'context:changed' { tabId, context, changedKeys, sourceComponentId }
+```
 
-This sequence gives visible value quickly without requiring a full rewrite.
+**Read path:**
+```
+bus 'context:changed'
+  → Component._initContextInputs() listener (wired by LayoutManager after init)
+      skips if sourceComponentId === this.constructor.id  (no self-loops)
+      skips if tabId !== activeTabId                      (inactive tabs)
+      for each key in static inputs that changed:
+        calls onInputChange(key, value)
+```
 
----
-
-## File impact (future implementation)
-
-Likely implementation files:
-- `public/core/layout.js`
-- `public/core/component.js`
-- `public/core/app.js`
-- `public/core/bus.js`
-- `plugins/okx/components/ticker/ticker.js`
-- `plugins/okx/components/chart/chart.js`
-- `plugins/okx/components/analysis/analysis.js`
-- `plugins/okx/components/order-panel/order-panel.js`
-- `plugins/okx/components/positions/positions.js`
-- `plugins/okx/components/open-orders/open-orders.js`
-- `plugins/okx/actions/market.js`
-- `plugins/okx/actions/analysis.js`
+`_initContextInputs()` is called automatically by `LayoutManager._mountPanel()` after `init()`. Components never call it directly.
 
 ---
 
-## Summary
+## What NOT to Put in Context
 
-The design principle is:
+Keep context small and semantic. Do **not** put these in context:
+- ticker price payloads
+- candle arrays
+- analysis blobs
+- position lists
+- loading states
+- server cache data
 
-- **workspace context** = shared tab-level truth
-- **component config** = per-instance persistent settings
-- **event bus** = propagation mechanism
-- **components** = explicit input/output nodes, not isolated panels
-
-This keeps the current architecture intact while making cross-component linkage first-class.
+These belong in component-local state or server-streamed events.
