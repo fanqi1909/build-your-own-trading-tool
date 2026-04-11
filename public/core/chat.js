@@ -70,15 +70,22 @@ export class ChatPanel {
 
     this._addMessage('user', message);
 
-    const layout = window.app?.layout;
+    const layout   = window.app?.layout;
+    const catalog  = window.app?.catalog || [];
     const snapshot = layout?.snapshot?.() || { activeTabId: null, tabs: [] };
+    const allActive = new Set((snapshot.tabs || []).flatMap(t => t.active || []));
+
     const dashboardContext = {
       activeTabId: snapshot.activeTabId,
       tabs: (snapshot.tabs || []).map(tab => ({
-        id: tab.id,
-        title: tab.title,
-        enabledIds: tab.active,
+        id:      tab.id,
+        title:   tab.title,
+        active:  tab.active || [],
+        context: tab.context || {},
       })),
+      availableComponents: catalog
+        .filter(c => !allActive.has(c.id))
+        .map(c => ({ id: c.id, label: c.title || c.label })),
     };
 
     this.bus.emit('ws:send', { action: 'chat', message, dashboardContext });

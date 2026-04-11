@@ -169,9 +169,20 @@ function register(ctx) {
 
       let layoutPrefix;
       if (dashboardContext?.tabs?.length) {
-        const lines = dashboardContext.tabs.map(tab => `- ${tab.title}: ${tab.enabledIds?.length ? tab.enabledIds.join(', ') : 'empty'}`);
-        const active = dashboardContext.tabs.find(tab => tab.id === dashboardContext.activeTabId);
-        layoutPrefix = `[Dashboard Tabs:\n${lines.join('\n')}\nActive Tab: ${active?.title || 'unknown'}]`;
+        const activeTab = dashboardContext.tabs.find(t => t.id === dashboardContext.activeTabId);
+        const tabLines  = dashboardContext.tabs.map(t =>
+          `- ${t.title} (id:${t.id}): ${t.active?.length ? t.active.join(', ') : 'empty'}`);
+        const ctxLine   = activeTab?.context && Object.keys(activeTab.context).length
+          ? `Context: ${Object.entries(activeTab.context).map(([k,v]) => `${k}=${v}`).join(', ')}`
+          : '';
+        const available = (dashboardContext.availableComponents || []).map(c => c.id).join(', ') || 'none';
+        layoutPrefix = [
+          '[Dashboard Tabs:',
+          ...tabLines,
+          `Active Tab: ${activeTab?.title || 'unknown'}`,
+          ctxLine,
+          `Not yet added: ${available}]`,
+        ].filter(Boolean).join('\n');
       } else {
         layoutPrefix = `[Layout: ${enabledIds.length ? enabledIds.join(', ') : 'empty'}]`;
       }
