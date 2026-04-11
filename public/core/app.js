@@ -273,15 +273,29 @@ class App {
         if (!this._dragFromId || this._dragFromId === id) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        grid.querySelectorAll('.panel--drop-target').forEach(p => p.classList.remove('panel--drop-target'));
-        panel.classList.add('panel--drop-target');
+        grid.querySelectorAll('.panel--drop-target, .panel--stack-target').forEach(p => {
+          p.classList.remove('panel--drop-target', 'panel--stack-target');
+        });
+        const r = panel.getBoundingClientRect();
+        const isBottom = e.clientY > r.top + r.height * 0.6;
+        panel.classList.add(isBottom ? 'panel--stack-target' : 'panel--drop-target');
       });
       panel.addEventListener('drop', (e) => {
         e.preventDefault();
         if (!this._dragFromId || this._dragFromId === id) return;
-        this.layout.reorder(this._dragFromId, id);
+        const fromId = this._dragFromId;
         this._dragFromId = null;
-        grid.querySelectorAll('.panel--drop-target').forEach(p => p.classList.remove('panel--drop-target'));
+        const r = panel.getBoundingClientRect();
+        const isBottom = e.clientY > r.top + r.height * 0.6;
+        grid.querySelectorAll('.panel--drop-target, .panel--stack-target').forEach(p => {
+          p.classList.remove('panel--drop-target', 'panel--stack-target');
+        });
+        if (isBottom) {
+          const colId = this.layout.getColId(id);
+          if (colId) this.layout.stackInto(fromId, colId);
+        } else {
+          this.layout.reorder(fromId, id);
+        }
       });
     }
 

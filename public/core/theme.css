@@ -275,6 +275,10 @@ body[data-ui-mode="build"] .layout-slot:hover .slot__stack-btn { opacity: 1; }
   box-shadow: 0 0 0 2px var(--blue);
   background: rgba(77,158,255,0.06);
 }
+.panel--stack-target {
+  box-shadow: 0 0 0 2px var(--green, #3ddc84);
+  background: rgba(61,220,132,0.08);
+}
 
 .panel--add-widget {
   display: flex;
@@ -706,12 +710,52 @@ body[data-ui-mode="build"] .layout-slot:hover .slot__stack-btn { opacity: 1; }
 }
 
 @media (max-width: 767px) {
-  #layout-grid { grid-template-columns: 1fr; }
+  /* ── Grid: single column, content-height rows, vertical scroll ── */
+  #layout-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+    align-content: start;
+  }
+  .layout-slot[data-span="1"],
+  .layout-slot[data-span="2"],
+  .layout-slot[data-span="3"] { grid-column: 1; }
 
-  .panel[data-size="half"],
-  .panel[data-size="full"] { grid-column: 1; }
+  /* Give each panel enough room to be useful */
+  .layout-slot > .panel { min-height: 260px; flex: none; }
 
-  .builder__presets { grid-template-columns: 1fr 1fr; }
+  /* Stacked panels in a slot each get their own min-height */
+  .layout-slot { height: auto; }
+
+  /* ── Tabs: horizontally scrollable ── */
+  #tabs-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #tabs-bar .tabs { flex-wrap: nowrap; }
+
+  /* ── Build mode: left panel becomes a bottom sheet ── */
+  #build-left {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    width: 100%;
+    max-height: 50vh;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    z-index: 200;
+    overflow-y: auto;
+  }
+
+  /* ── Hide build-topbar presets on mobile (just show Done) ── */
+  #build-topbar .btb__preset { display: none; }
+  #build-topbar .btb__label  { display: none; }
+
+  /* ── Slot build buttons: bigger tap targets ── */
+  .slot__size-btn, .slot__stack-btn {
+    opacity: 1;            /* always visible on touch */
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  /* ── Chat trigger: keep accessible above build panel ── */
+  #chat-trigger { bottom: calc(50vh + 16px); }
+  body:not([data-ui-mode="build"]) #chat-trigger { bottom: 24px; }
 }
 
 ::-webkit-scrollbar              { width: 4px; }
