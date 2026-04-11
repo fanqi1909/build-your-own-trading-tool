@@ -26,6 +26,8 @@ function register(ctx) {
 
   // Instrument metadata cache: instId → { instId, baseCcy, ctVal, lotSz, minSz, tickSz, maxLever }
   cache.instruments = {};
+  // Active instrument (updated by client via fetchTicker)
+  cache.activeInst = 'BTC-USDT';
 
   async function _loadInstruments() {
     try {
@@ -47,7 +49,7 @@ function register(ctx) {
     }
   }
 
-  async function fastRefresh(inst = 'BTC-USDT') {
+  async function fastRefresh(inst = cache.activeInst || 'BTC-USDT') {
     try {
       cache.ticker = await adapter.fetchTicker(inst, getMode());
     } catch (e) {
@@ -81,7 +83,7 @@ function register(ctx) {
     return `【主图 ${bar}】\n${primary}\n【趋势参考 ${higherBar}】\n${higher}${lowerSection}`;
   }
 
-  async function candleRefresh(inst = 'BTC-USDT', bar = '15m') {
+  async function candleRefresh(inst = cache.activeInst || 'BTC-USDT', bar = '15m') {
     try {
       const conn    = stores.candles.getCandleConn();
       const fetches = [adapter.fetchCandles(inst, bar, 100, getMode())];
@@ -116,7 +118,9 @@ function register(ctx) {
     },
 
     async fetchTicker(msg) {
-      await fastRefresh(msg.inst || 'BTC-USDT');
+      const inst = msg.inst || cache.activeInst || 'BTC-USDT';
+      cache.activeInst = inst;   // remember for timer
+      await fastRefresh(inst);
     },
 
     async fetchAtr(msg) {

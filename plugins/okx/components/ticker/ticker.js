@@ -61,6 +61,12 @@ export default class TickerComponent extends Component {
       this._instrument = value;
       const select = this.el.querySelector('#ticker-select');
       if (select && select.value !== value) select.value = value;
+      // Clear stale price data immediately
+      const priceEl = this.el.querySelector('#ticker-price');
+      if (priceEl) priceEl.textContent = '—';
+      const metaEl = this.el.querySelector('#ticker-meta');
+      if (metaEl) metaEl.innerHTML = '';
+      this._prevPrice = null;
       this.send('fetchTicker', { inst: this._instrument.replace('-SWAP', '') });
     }
   }
